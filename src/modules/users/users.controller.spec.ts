@@ -14,7 +14,7 @@ describe('UsersController', () => {
     softDelete: jest.Mock;
   };
 
-  const mockUser = { _id: new Types.ObjectId(), email: 'test@test.com', displayName: 'Test' };
+  const mockUser = { _id: new Types.ObjectId(), email: 'test@test.com', displayName: 'John Doe', photoUrl: 'https://example.com/photo.jpg', createdAt: new Date('2026-01-01') };
 
   beforeEach(async () => {
     mockService = {
@@ -40,9 +40,26 @@ describe('UsersController', () => {
     expect(controller).toBeDefined();
   });
 
-  it('getMe - should return user with style profile', async () => {
+  it('getMe - should serialize user fields for Flutter contract', async () => {
     const result = await controller.getMe(mockUser as never);
-    expect(result.styleProfile).toBeNull();
+    expect(result.id).toBe(String(mockUser._id));
+    expect(result.firstName).toBe('John');
+    expect(result.lastName).toBe('Doe');
+    expect(result.avatarUrl).toBe(mockUser.photoUrl);
+    expect(result.hasStyleProfile).toBe(false);
+  });
+
+  it('getMe - hasStyleProfile true when profile exists', async () => {
+    mockService.getStyleProfile.mockResolvedValue({ preferredStyles: ['casual'] });
+    const result = await controller.getMe(mockUser as never);
+    expect(result.hasStyleProfile).toBe(true);
+  });
+
+  it('getMe - handles single-word displayName (no lastName)', async () => {
+    const singleNameUser = { ...mockUser, displayName: 'Cher' };
+    const result = await controller.getMe(singleNameUser as never);
+    expect(result.firstName).toBe('Cher');
+    expect(result.lastName).toBe('');
   });
 
   it('updateMe - should update user', async () => {

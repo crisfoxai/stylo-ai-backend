@@ -17,6 +17,19 @@ import { UserDocument } from './schemas/user.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateStyleProfileDto } from './dto/style-profile.dto';
 
+function serializeUser(user: UserDocument, hasStyleProfile: boolean) {
+  const parts = (user.displayName ?? '').trim().split(/\s+/);
+  return {
+    id: String(user._id),
+    email: user.email,
+    firstName: parts[0] ?? '',
+    lastName: parts.length > 1 ? parts.slice(1).join(' ') : '',
+    avatarUrl: user.photoUrl ?? null,
+    hasStyleProfile,
+    createdAt: user.createdAt,
+  };
+}
+
 @ApiTags('users')
 @Controller('users')
 @UseGuards(FirebaseAuthGuard)
@@ -28,7 +41,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Get current user profile' })
   async getMe(@CurrentUser() user: UserDocument) {
     const styleProfile = await this.usersService.getStyleProfile(String(user._id));
-    return { ...user, styleProfile };
+    return serializeUser(user, styleProfile !== null);
   }
 
   @Patch('me')
