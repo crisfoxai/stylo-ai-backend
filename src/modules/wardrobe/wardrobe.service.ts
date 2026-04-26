@@ -113,6 +113,7 @@ export class WardrobeService {
       archived: false,
     };
 
+    if (dto.type) filter['type'] = dto.type;
     if (dto.category) filter['category'] = dto.category;
     if (dto.color) filter['color'] = dto.color;
     if (dto.q) filter['$or'] = [

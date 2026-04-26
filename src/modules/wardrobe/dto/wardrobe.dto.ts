@@ -11,6 +11,11 @@ export class ListWardrobeDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  type?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   color?: string;
 
   @ApiPropertyOptional()
