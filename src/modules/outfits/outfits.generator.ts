@@ -32,7 +32,7 @@ export class OutfitsGenerator {
     const composition: { wardrobeItemId: Types.ObjectId; slot: string }[] = [];
 
     for (const slot of SLOTS) {
-      const candidates = items.filter((i) => i.category === slot);
+      const candidates = items.filter((i) => i.type === slot);
       if (candidates.length > 0) {
         const picked = candidates[Math.floor(Math.random() * candidates.length)];
         composition.push({ wardrobeItemId: picked._id as Types.ObjectId, slot });
