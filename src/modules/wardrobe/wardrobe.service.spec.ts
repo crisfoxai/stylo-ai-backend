@@ -133,7 +133,8 @@ describe('WardrobeService', () => {
       const mockItem = { _id: new Types.ObjectId(), status: 'ready', userId };
       mockItemModel.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockItem) });
       const result = await service.findOne(userId, String(mockItem._id));
-      expect(result).toEqual(mockItem);
+      expect(result.id).toBe(String(mockItem._id));
+      expect(result.status).toBe('ready');
     });
   });
 

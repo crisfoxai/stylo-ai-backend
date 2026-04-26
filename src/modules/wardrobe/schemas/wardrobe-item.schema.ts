@@ -17,6 +17,9 @@ export class WardrobeItem {
   imageProcessedUrl?: string;
 
   @Prop({ default: '' })
+  name!: string;
+
+  @Prop({ default: '' })
   type!: string;
 
   @Prop({ default: '' })

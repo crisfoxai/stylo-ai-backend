@@ -23,6 +23,7 @@ describe('R2Service', () => {
         {
           provide: ConfigService,
           useValue: {
+            get: jest.fn().mockReturnValue(undefined),
             getOrThrow: jest.fn().mockImplementation((key: string) => {
               const values: Record<string, string> = {
                 R2_ACCOUNT_ID: 'test-account',

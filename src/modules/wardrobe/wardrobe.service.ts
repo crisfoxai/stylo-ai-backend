@@ -63,6 +63,7 @@ export class WardrobeService {
 
       await this.itemModel.findByIdAndUpdate(itemId, {
         $set: {
+          name: classifyResult.name || `${classifyResult.color} ${classifyResult.category}`,
           type: classifyResult.type,
           category: classifyResult.category,
           color: classifyResult.color,
@@ -101,7 +102,12 @@ export class WardrobeService {
     };
   }
 
-  async list(userId: string, dto: ListWardrobeDto): Promise<{ items: WardrobeItemDocument[]; total: number; page: number }> {
+  private toDto(item: Record<string, unknown>): Record<string, unknown> & { id: string } {
+    const { _id, __v, ...rest } = item;
+    return { id: String(_id), ...rest };
+  }
+
+  async list(userId: string, dto: ListWardrobeDto): Promise<{ items: (Record<string, unknown> & { id: string })[]; total: number; page: number }> {
     const filter: FilterQuery<WardrobeItem> = {
       userId: new Types.ObjectId(userId),
       archived: false,
@@ -123,10 +129,10 @@ export class WardrobeService {
       this.itemModel.countDocuments(filter),
     ]);
 
-    return { items: items as WardrobeItemDocument[], total, page };
+    return { items: items.map((i) => this.toDto(i as Record<string, unknown>)), total, page };
   }
 
-  async findOne(userId: string, itemId: string): Promise<WardrobeItemDocument> {
+  async findOne(userId: string, itemId: string): Promise<Record<string, unknown> & { id: string }> {
     const item = await this.itemModel.findOne({
       _id: new Types.ObjectId(itemId),
       userId: new Types.ObjectId(userId),
@@ -134,14 +140,14 @@ export class WardrobeService {
     }).lean();
 
     if (!item) throw new NotFoundException({ error: 'NOT_FOUND' });
-    return item as WardrobeItemDocument;
+    return this.toDto(item as Record<string, unknown>);
   }
 
   async update(
     userId: string,
     itemId: string,
     dto: UpdateWardrobeItemDto,
-  ): Promise<WardrobeItemDocument> {
+  ): Promise<Record<string, unknown> & { id: string }> {
     const item = await this.itemModel.findOneAndUpdate(
       { _id: new Types.ObjectId(itemId), userId: new Types.ObjectId(userId), archived: false },
       { $set: dto },
@@ -149,7 +155,7 @@ export class WardrobeService {
     ).lean();
 
     if (!item) throw new NotFoundException({ error: 'NOT_FOUND' });
-    return item as WardrobeItemDocument;
+    return this.toDto(item as Record<string, unknown>);
   }
 
   async softDelete(userId: string, itemId: string): Promise<void> {

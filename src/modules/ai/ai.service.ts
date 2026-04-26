@@ -6,6 +6,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ClassifyResult {
+  name: string;
   type: string;
   color: string;
   category: string;
@@ -23,6 +24,7 @@ export interface TryonResult {
 
 // Fallback classification when AI fails — keeps the pipeline moving
 const FALLBACK_CLASSIFY: ClassifyResult = {
+  name: '',
   type: 'unknown',
   color: 'unknown',
   category: 'unknown',
@@ -36,7 +38,8 @@ const QA_TEST_IMAGE_URL =
 
 const CLASSIFY_PROMPT =
   'Analyze this clothing item and respond with ONLY valid JSON, no markdown, no explanation: ' +
-  '{"type": string, "category": string, "color": string, "material": string, "confidence": number}. ' +
+  '{"name": string, "type": string, "category": string, "color": string, "material": string, "confidence": number}. ' +
+  'name: descriptive name in Spanish, e.g. "Remera gris de algodón", "Pantalón negro de jean", "Zapatillas blancas". ' +
   'type options: top/bottom/shoes/outerwear/accessory. ' +
   'category: shirt/pants/dress/jacket/sneakers/boots/bag/hat/etc. ' +
   'color: main color name in English. ' +
@@ -117,6 +120,7 @@ export class AIService {
       const parsed = JSON.parse(jsonText) as ClassifyResult;
 
       return {
+        name: String(parsed.name ?? ''),
         type: String(parsed.type ?? 'unknown'),
         category: String(parsed.category ?? 'unknown'),
         color: String(parsed.color ?? 'unknown'),
