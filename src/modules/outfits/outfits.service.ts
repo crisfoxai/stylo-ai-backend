@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+
+function assertObjectId(value: string, field = 'id'): void {
+  if (!Types.ObjectId.isValid(value)) {
+    throw new BadRequestException({ error: 'INVALID_ID', field });
+  }
+}
 import { Outfit, OutfitDocument } from './schemas/outfit.schema';
 import { FavoriteOutfit, FavoriteOutfitDocument } from './schemas/favorite-outfit.schema';
 import { WornEntry, WornEntryDocument } from './schemas/worn-entry.schema';
@@ -80,6 +86,7 @@ export class OutfitsService {
   }
 
   async markWorn(userId: string, outfitId: string): Promise<WornEntryDocument> {
+    assertObjectId(outfitId, 'outfitId');
     const outfit = await this.outfitModel.findOne({
       _id: new Types.ObjectId(outfitId),
       userId: new Types.ObjectId(userId),
@@ -94,6 +101,7 @@ export class OutfitsService {
   }
 
   async findOne(userId: string, outfitId: string): Promise<Record<string, unknown>> {
+    assertObjectId(outfitId, 'outfitId');
     const outfit = await this.outfitModel.findOne({
       _id: new Types.ObjectId(outfitId),
       userId: new Types.ObjectId(userId),

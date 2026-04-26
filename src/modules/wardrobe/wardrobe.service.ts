@@ -2,9 +2,16 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
+
+function assertObjectId(value: string, field = 'id'): void {
+  if (!Types.ObjectId.isValid(value)) {
+    throw new BadRequestException({ error: 'INVALID_ID', field });
+  }
+}
 import { v4 as uuidv4 } from 'uuid';
 import { WardrobeItem, WardrobeItemDocument } from './schemas/wardrobe-item.schema';
 import { WardrobeJob, WardrobeJobDocument } from './schemas/wardrobe-job.schema';
@@ -108,6 +115,7 @@ export class WardrobeService {
   }
 
   async list(userId: string, dto: ListWardrobeDto): Promise<{ items: (Record<string, unknown> & { id: string })[]; total: number; page: number }> {
+    assertObjectId(userId, 'userId');
     const filter: FilterQuery<WardrobeItem> = {
       userId: new Types.ObjectId(userId),
       archived: false,
@@ -134,6 +142,8 @@ export class WardrobeService {
   }
 
   async findOne(userId: string, itemId: string): Promise<Record<string, unknown> & { id: string }> {
+    assertObjectId(userId, 'userId');
+    assertObjectId(itemId, 'itemId');
     const item = await this.itemModel.findOne({
       _id: new Types.ObjectId(itemId),
       userId: new Types.ObjectId(userId),
@@ -149,6 +159,8 @@ export class WardrobeService {
     itemId: string,
     dto: UpdateWardrobeItemDto,
   ): Promise<Record<string, unknown> & { id: string }> {
+    assertObjectId(userId, 'userId');
+    assertObjectId(itemId, 'itemId');
     const item = await this.itemModel.findOneAndUpdate(
       { _id: new Types.ObjectId(itemId), userId: new Types.ObjectId(userId), archived: false },
       { $set: dto },
@@ -160,6 +172,8 @@ export class WardrobeService {
   }
 
   async softDelete(userId: string, itemId: string): Promise<void> {
+    assertObjectId(userId, 'userId');
+    assertObjectId(itemId, 'itemId');
     const item = await this.itemModel.findOne({
       _id: new Types.ObjectId(itemId),
       userId: new Types.ObjectId(userId),

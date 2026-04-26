@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Favorite } from './schemas/favorite.schema';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+
+function assertObjectId(value: string, field = 'id'): void {
+  if (!Types.ObjectId.isValid(value)) {
+    throw new BadRequestException({ error: 'INVALID_ID', field });
+  }
+}
 
 @Injectable()
 export class FavoritesService {
@@ -11,6 +17,8 @@ export class FavoritesService {
   ) {}
 
   async add(userId: string, outfitId: string) {
+    assertObjectId(userId, 'userId');
+    assertObjectId(outfitId, 'outfitId');
     const existing = await this.model.findOne({
       userId: new Types.ObjectId(userId),
       outfitId: new Types.ObjectId(outfitId),
@@ -29,6 +37,8 @@ export class FavoritesService {
   }
 
   async remove(userId: string, outfitId: string) {
+    assertObjectId(userId, 'userId');
+    assertObjectId(outfitId, 'outfitId');
     const result = await this.model.findOneAndDelete({
       userId: new Types.ObjectId(userId),
       outfitId: new Types.ObjectId(outfitId),
@@ -38,6 +48,8 @@ export class FavoritesService {
   }
 
   async toggle(userId: string, outfitId: string) {
+    assertObjectId(userId, 'userId');
+    assertObjectId(outfitId, 'outfitId');
     const existing = await this.model.findOne({
       userId: new Types.ObjectId(userId),
       outfitId: new Types.ObjectId(outfitId),
@@ -54,6 +66,7 @@ export class FavoritesService {
   }
 
   async findAll(userId: string, pagination: PaginationDto) {
+    assertObjectId(userId, 'userId');
     const { page = 1, limit = 20 } = pagination;
     const skip = (page - 1) * limit;
     const filter = { userId: new Types.ObjectId(userId) };
