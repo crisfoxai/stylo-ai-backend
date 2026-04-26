@@ -6,7 +6,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import { Readable } from 'stream';
 import { WardrobeItem, WardrobeItemDocument } from './schemas/wardrobe-item.schema';
 import { WardrobeJob, WardrobeJobDocument } from './schemas/wardrobe-job.schema';
 import { ListWardrobeDto, UpdateWardrobeItemDto } from './dto/wardrobe.dto';
@@ -30,7 +29,7 @@ export class WardrobeService {
     const imageUrl = await this.r2Service.uploadStream(
       bucket,
       key,
-      Readable.from(file.buffer),
+      file.buffer,
       file.mimetype,
     );
 

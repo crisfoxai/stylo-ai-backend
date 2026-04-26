@@ -20,11 +20,20 @@ export interface TryonResult {
   resultUrl: string;
 }
 
+const MOCK_CLASSIFY: ClassifyResult = {
+  type: 'top',
+  color: 'blue',
+  category: 'top',
+  material: 'cotton',
+  confidence: 0.9,
+};
+
 @Injectable()
 export class AIService {
   private readonly logger = new Logger(AIService.name);
   private readonly baseUrl: string;
   private readonly internalKey: string;
+  private readonly mockMode: boolean;
 
   constructor(
     private readonly configService: ConfigService,
@@ -32,18 +41,29 @@ export class AIService {
   ) {
     this.baseUrl = configService.getOrThrow<string>('AI_SERVICE_URL');
     this.internalKey = configService.getOrThrow<string>('AI_SERVICE_INTERNAL_KEY');
+    this.mockMode =
+      this.baseUrl.includes('localhost') ||
+      this.baseUrl.includes('127.0.0.1') ||
+      configService.get<string>('AI_SERVICE_MOCK') === 'true';
+
+    if (this.mockMode) {
+      this.logger.warn('AIService running in MOCK mode — no real AI calls will be made');
+    }
   }
 
-  async classify(imageUrl: string): Promise<ClassifyResult> {
-    return this.callWithRetry<ClassifyResult>('/classify', { imageUrl });
+  async classify(_imageUrl: string): Promise<ClassifyResult> {
+    if (this.mockMode) return { ...MOCK_CLASSIFY };
+    return this.callWithRetry<ClassifyResult>('/classify', { imageUrl: _imageUrl });
   }
 
-  async removeBg(imageUrl: string): Promise<RemoveBgResult> {
-    return this.callWithRetry<RemoveBgResult>('/remove-bg', { imageUrl });
+  async removeBg(_imageUrl: string): Promise<RemoveBgResult> {
+    if (this.mockMode) return { processedUrl: _imageUrl };
+    return this.callWithRetry<RemoveBgResult>('/remove-bg', { imageUrl: _imageUrl });
   }
 
-  async tryon(userPhotoUrl: string, itemUrls: string[]): Promise<TryonResult> {
-    return this.callWithRetry<TryonResult>('/tryon', { userPhotoUrl, itemUrls });
+  async tryon(_userPhotoUrl: string, _itemUrls: string[]): Promise<TryonResult> {
+    if (this.mockMode) return { resultUrl: _userPhotoUrl };
+    return this.callWithRetry<TryonResult>('/tryon', { userPhotoUrl: _userPhotoUrl, itemUrls: _itemUrls });
   }
 
   private async callWithRetry<T>(path: string, body: Record<string, unknown>): Promise<T> {
