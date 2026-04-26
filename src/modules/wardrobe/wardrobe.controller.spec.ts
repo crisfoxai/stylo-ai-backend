@@ -12,6 +12,7 @@ describe('WardrobeController', () => {
     findOne: jest.Mock;
     update: jest.Mock;
     softDelete: jest.Mock;
+    getJob: jest.Mock;
   };
 
   const mockUser = { _id: new Types.ObjectId(), firebaseUid: 'fb123', email: 'test@test.com' };
@@ -23,6 +24,7 @@ describe('WardrobeController', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       softDelete: jest.fn(),
+      getJob: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { WardrobeItem, WardrobeItemDocument } from '../wardrobe/schemas/wardrobe-item.schema';
-import { StyleProfileDocument } from '../users/schemas/style-profile.schema';
+import { StyleProfileDocument } from '../style-profile/schemas/style-profile.schema';
 import { WeatherData } from '../weather/weather.service';
 
 export interface OutfitComposition {

@@ -10,7 +10,6 @@ describe('UsersController', () => {
     findById: jest.Mock;
     update: jest.Mock;
     getStyleProfile: jest.Mock;
-    upsertStyleProfile: jest.Mock;
     softDelete: jest.Mock;
   };
 
@@ -21,7 +20,6 @@ describe('UsersController', () => {
       findById: jest.fn(),
       update: jest.fn(),
       getStyleProfile: jest.fn().mockResolvedValue(null),
-      upsertStyleProfile: jest.fn(),
       softDelete: jest.fn(),
     };
 
@@ -66,13 +64,6 @@ describe('UsersController', () => {
     mockService.update.mockResolvedValue({ ...mockUser, displayName: 'New Name' });
     const result = await controller.updateMe(mockUser as never, { displayName: 'New Name' });
     expect(result.displayName).toBe('New Name');
-  });
-
-  it('updateStyleProfile - should upsert profile', async () => {
-    const mockProfile = { preferredStyles: ['casual'] };
-    mockService.upsertStyleProfile.mockResolvedValue(mockProfile);
-    const result = await controller.updateStyleProfile(mockUser as never, { preferredStyles: ['casual'] });
-    expect(result).toEqual(mockProfile);
   });
 
   it('deleteMe - should soft delete user', async () => {

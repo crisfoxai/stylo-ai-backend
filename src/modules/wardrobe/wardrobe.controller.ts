@@ -51,6 +51,12 @@ export class WardrobeController {
     return this.wardrobeService.create(String(user._id), file);
   }
 
+  @Get('jobs/:jobId')
+  @ApiOperation({ summary: 'Poll wardrobe upload job status' })
+  async getJob(@CurrentUser() user: UserDocument, @Param('jobId') jobId: string) {
+    return this.wardrobeService.getJob(String(user._id), jobId);
+  }
+
   @Get()
   @ApiOperation({ summary: 'List garments (paginated + filtered)' })
   async list(@CurrentUser() user: UserDocument, @Query() dto: ListWardrobeDto) {

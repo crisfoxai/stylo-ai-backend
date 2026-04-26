@@ -28,10 +28,10 @@ export class AuthService {
     const { uid, email, name, picture } = decodedToken;
 
     const user = await this.userModel.findOneAndUpdate(
-      { firebaseUid: uid },
+      { $or: [{ firebaseUid: uid }, { email: email ?? '' }] },
       {
+        $set: { firebaseUid: uid },
         $setOnInsert: {
-          firebaseUid: uid,
           email: email ?? '',
           displayName: name ?? '',
           photoUrl: picture ?? '',

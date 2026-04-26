@@ -1,16 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
-import { StyleProfile, StyleProfileDocument } from './schemas/style-profile.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UpdateStyleProfileDto } from './dto/style-profile.dto';
+import { StyleProfileService } from '../style-profile/style-profile.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(StyleProfile.name) private readonly styleProfileModel: Model<StyleProfileDocument>,
+    private readonly styleProfileService: StyleProfileService,
   ) {}
 
   async findById(userId: string): Promise<UserDocument> {
@@ -27,22 +26,12 @@ export class UsersService {
     return user as UserDocument;
   }
 
-  async getStyleProfile(userId: string): Promise<StyleProfileDocument | null> {
-    return this.styleProfileModel.findOne({ userId: new Types.ObjectId(userId) }).lean() as Promise<StyleProfileDocument | null>;
-  }
-
-  async upsertStyleProfile(
-    userId: string,
-    dto: UpdateStyleProfileDto,
-  ): Promise<StyleProfileDocument> {
-    const profile = await this.styleProfileModel
-      .findOneAndUpdate(
-        { userId: new Types.ObjectId(userId) },
-        { $set: { ...dto, updatedAt: new Date() } },
-        { upsert: true, new: true },
-      )
-      .lean();
-    return profile as StyleProfileDocument;
+  async getStyleProfile(userId: string) {
+    try {
+      return await this.styleProfileService.findByUser(userId);
+    } catch {
+      return null;
+    }
   }
 
   async softDelete(userId: string): Promise<void> {

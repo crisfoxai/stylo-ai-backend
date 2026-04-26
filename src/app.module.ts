@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import Joi from 'joi';
+import * as Joi from 'joi';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { WardrobeModule } from './modules/wardrobe/wardrobe.module';
@@ -16,6 +16,9 @@ import { AIModule } from './modules/ai/ai.module';
 import { WeatherModule } from './modules/weather/weather.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { HealthModule } from './modules/health/health.module';
+import { StyleProfileModule } from './modules/style-profile/style-profile.module';
+import { FavoritesModule } from './modules/favorites/favorites.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 
 @Module({
   imports: [
@@ -66,6 +69,9 @@ import { HealthModule } from './modules/health/health.module';
     WeatherModule,
     StorageModule,
     HealthModule,
+    StyleProfileModule,
+    FavoritesModule,
+    FeedbackModule,
   ],
 })
 export class AppModule implements NestModule {

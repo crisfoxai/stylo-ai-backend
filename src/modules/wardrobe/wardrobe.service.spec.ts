@@ -4,6 +4,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { WardrobeService } from './wardrobe.service';
 import { WardrobeItem } from './schemas/wardrobe-item.schema';
+import { WardrobeJob } from './schemas/wardrobe-job.schema';
 import { AIService } from '../ai/ai.service';
 import { R2Service } from '../storage/r2.service';
 
@@ -16,6 +17,11 @@ describe('WardrobeService', () => {
     findOneAndUpdate: jest.Mock;
     findByIdAndUpdate: jest.Mock;
     countDocuments: jest.Mock;
+  };
+  let mockJobModel: {
+    create: jest.Mock;
+    findOne: jest.Mock;
+    findOneAndUpdate: jest.Mock;
   };
   let mockAIService: { classify: jest.Mock; removeBg: jest.Mock };
   let mockR2Service: {
@@ -36,6 +42,12 @@ describe('WardrobeService', () => {
       countDocuments: jest.fn(),
     };
 
+    mockJobModel = {
+      create: jest.fn().mockResolvedValue({ jobId: 'test-job-id', status: 'processing' }),
+      findOne: jest.fn(),
+      findOneAndUpdate: jest.fn().mockResolvedValue({}),
+    };
+
     mockAIService = {
       classify: jest.fn(),
       removeBg: jest.fn(),
@@ -51,6 +63,7 @@ describe('WardrobeService', () => {
       providers: [
         WardrobeService,
         { provide: getModelToken(WardrobeItem.name), useValue: mockItemModel },
+        { provide: getModelToken(WardrobeJob.name), useValue: mockJobModel },
         { provide: AIService, useValue: mockAIService },
         { provide: R2Service, useValue: mockR2Service },
       ],

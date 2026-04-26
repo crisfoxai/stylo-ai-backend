@@ -8,6 +8,7 @@ import { Model, Types, FilterQuery } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { Readable } from 'stream';
 import { WardrobeItem, WardrobeItemDocument } from './schemas/wardrobe-item.schema';
+import { WardrobeJob, WardrobeJobDocument } from './schemas/wardrobe-job.schema';
 import { ListWardrobeDto, UpdateWardrobeItemDto } from './dto/wardrobe.dto';
 import { AIService } from '../ai/ai.service';
 import { R2Service } from '../storage/r2.service';
@@ -16,12 +17,14 @@ import { R2Service } from '../storage/r2.service';
 export class WardrobeService {
   constructor(
     @InjectModel(WardrobeItem.name) private readonly itemModel: Model<WardrobeItemDocument>,
+    @InjectModel(WardrobeJob.name) private readonly jobModel: Model<WardrobeJobDocument>,
     private readonly aiService: AIService,
     private readonly r2Service: R2Service,
   ) {}
 
-  async create(userId: string, file: Express.Multer.File): Promise<WardrobeItemDocument> {
-    const key = `${userId}/${uuidv4()}-${file.originalname}`;
+  async create(userId: string, file: Express.Multer.File): Promise<{ jobId: string; status: string }> {
+    const jobId = uuidv4();
+    const key = `${userId}/${jobId}-${file.originalname}`;
     const bucket = this.r2Service.bucketWardrobe();
 
     const imageUrl = await this.r2Service.uploadStream(
@@ -31,21 +34,28 @@ export class WardrobeService {
       file.mimetype,
     );
 
-    const item = await this.itemModel.create({
-      userId: new Types.ObjectId(userId),
-      imageUrl,
-      status: 'processing',
-      tags: [],
+    const [item] = await Promise.all([
+      this.itemModel.create({
+        userId: new Types.ObjectId(userId),
+        imageUrl,
+        status: 'processing',
+        tags: [],
+      }),
+      this.jobModel.create({
+        jobId,
+        userId: new Types.ObjectId(userId),
+        status: 'processing',
+      }),
+    ]);
+
+    this.runAIPipeline(String(item._id), jobId, imageUrl).catch(() => {
+      // fire-and-forget
     });
 
-    this.runAIPipeline(String(item._id), imageUrl).catch(() => {
-      // fire-and-forget, errors handled inside
-    });
-
-    return item;
+    return { jobId, status: 'processing' };
   }
 
-  private async runAIPipeline(itemId: string, imageUrl: string): Promise<void> {
+  private async runAIPipeline(itemId: string, jobId: string, imageUrl: string): Promise<void> {
     try {
       const [classifyResult, removeBgResult] = await Promise.all([
         this.aiService.classify(imageUrl),
@@ -63,9 +73,33 @@ export class WardrobeService {
           status: 'ready',
         },
       });
-    } catch {
+
+      await this.jobModel.findOneAndUpdate(
+        { jobId },
+        { $set: { status: 'done', garmentId: new Types.ObjectId(itemId) } },
+      );
+    } catch (err) {
       await this.itemModel.findByIdAndUpdate(itemId, { $set: { status: 'failed' } });
+      await this.jobModel.findOneAndUpdate(
+        { jobId },
+        { $set: { status: 'failed', error: (err as Error).message } },
+      );
     }
+  }
+
+  async getJob(userId: string, jobId: string): Promise<{ jobId: string; status: string; garmentId?: string }> {
+    const job = await this.jobModel.findOne({
+      jobId,
+      userId: new Types.ObjectId(userId),
+    }).lean();
+
+    if (!job) throw new NotFoundException({ error: 'JOB_NOT_FOUND' });
+
+    return {
+      jobId: job.jobId,
+      status: job.status,
+      ...(job.garmentId ? { garmentId: job.garmentId.toString() } : {}),
+    };
   }
 
   async list(userId: string, dto: ListWardrobeDto): Promise<{ items: WardrobeItemDocument[]; total: number; page: number }> {

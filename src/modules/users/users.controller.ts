@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Patch,
-  Put,
   Delete,
   Body,
   UseGuards,
@@ -15,7 +14,6 @@ import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserDocument } from './schemas/user.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UpdateStyleProfileDto } from './dto/style-profile.dto';
 
 function serializeUser(user: UserDocument, hasStyleProfile: boolean) {
   const parts = (user.displayName ?? '').trim().split(/\s+/);
@@ -48,12 +46,6 @@ export class UsersController {
   @ApiOperation({ summary: 'Update display name or photo URL' })
   async updateMe(@CurrentUser() user: UserDocument, @Body() dto: UpdateUserDto) {
     return this.usersService.update(String(user._id), dto);
-  }
-
-  @Put('me/style-profile')
-  @ApiOperation({ summary: 'Set style quiz results' })
-  async updateStyleProfile(@CurrentUser() user: UserDocument, @Body() dto: UpdateStyleProfileDto) {
-    return this.usersService.upsertStyleProfile(String(user._id), dto);
   }
 
   @Delete('me')

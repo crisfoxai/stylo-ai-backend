@@ -4,12 +4,12 @@ import { NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { UsersService } from './users.service';
 import { User } from './schemas/user.schema';
-import { StyleProfile } from './schemas/style-profile.schema';
+import { StyleProfileService } from '../style-profile/style-profile.service';
 
 describe('UsersService', () => {
   let service: UsersService;
   let mockUserModel: { findById: jest.Mock; findByIdAndUpdate: jest.Mock };
-  let mockStyleProfileModel: { findOne: jest.Mock; findOneAndUpdate: jest.Mock };
+  let mockStyleProfileService: { findByUser: jest.Mock };
 
   const userId = new Types.ObjectId().toString();
 
@@ -18,16 +18,15 @@ describe('UsersService', () => {
       findById: jest.fn(),
       findByIdAndUpdate: jest.fn(),
     };
-    mockStyleProfileModel = {
-      findOne: jest.fn(),
-      findOneAndUpdate: jest.fn(),
+    mockStyleProfileService = {
+      findByUser: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: getModelToken(User.name), useValue: mockUserModel },
-        { provide: getModelToken(StyleProfile.name), useValue: mockStyleProfileModel },
+        { provide: StyleProfileService, useValue: mockStyleProfileService },
       ],
     }).compile();
 
@@ -68,25 +67,16 @@ describe('UsersService', () => {
 
   describe('getStyleProfile', () => {
     it('should return style profile', async () => {
-      const mockProfile = { userId, preferredStyles: ['casual'] };
-      mockStyleProfileModel.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockProfile) });
+      const mockProfile = { userId, styles: ['casual'] };
+      mockStyleProfileService.findByUser.mockResolvedValue(mockProfile);
       const result = await service.getStyleProfile(userId);
       expect(result).toEqual(mockProfile);
     });
 
     it('should return null if no profile', async () => {
-      mockStyleProfileModel.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+      mockStyleProfileService.findByUser.mockRejectedValue(new Error('not found'));
       const result = await service.getStyleProfile(userId);
       expect(result).toBeNull();
-    });
-  });
-
-  describe('upsertStyleProfile', () => {
-    it('should create/update style profile', async () => {
-      const mockProfile = { userId, preferredStyles: ['casual'], preferredColors: ['blue'] };
-      mockStyleProfileModel.findOneAndUpdate.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockProfile) });
-      const result = await service.upsertStyleProfile(userId, { preferredStyles: ['casual'] });
-      expect(result).toEqual(mockProfile);
     });
   });
 
