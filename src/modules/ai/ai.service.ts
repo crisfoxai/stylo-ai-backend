@@ -105,7 +105,7 @@ export class AIService {
       const mimeType =
         (imageResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
 
-      const model = this.geminiClient!.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model = this.geminiClient!.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const result = await model.generateContent([
         { inlineData: { data: base64Image, mimeType } },
         CLASSIFY_PROMPT,
