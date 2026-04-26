@@ -33,6 +33,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
         R2_ACCOUNT_ID: Joi.string().required(),
         R2_ACCESS_KEY_ID: Joi.string().required(),
         R2_SECRET_ACCESS_KEY: Joi.string().required(),
+        R2_PUBLIC_URL: Joi.string().optional(),
         R2_BUCKET_WARDROBE: Joi.string().required(),
         R2_BUCKET_TRYON: Joi.string().required(),
         R2_BUCKET_AVATARS: Joi.string().required(),
