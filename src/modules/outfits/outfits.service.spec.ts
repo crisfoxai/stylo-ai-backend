@@ -27,7 +27,7 @@ describe('OutfitsService', () => {
     mockOutfitModel = { create: jest.fn(), findOne: jest.fn(), find: jest.fn().mockReturnValue(chainMock) };
     mockFavoriteModel = { updateOne: jest.fn(), deleteOne: jest.fn(), find: jest.fn() };
     mockWornModel = { create: jest.fn(), find: jest.fn(), countDocuments: jest.fn() };
-    mockGenerator = { compose: jest.fn().mockResolvedValue({ items: [], aiModel: 'test' }) };
+    mockGenerator = { compose: jest.fn().mockResolvedValue({ items: [], garments: [], aiModel: 'test' }) };
     mockWeatherService = { getByLocation: jest.fn().mockResolvedValue({ tempC: 20, condition: 'clear', lat: 0, lon: 0 }) };
     mockUsersService = { getStyleProfile: jest.fn().mockResolvedValue(null) };
 
@@ -56,7 +56,9 @@ describe('OutfitsService', () => {
       mockOutfitModel.create.mockResolvedValue(mockOutfit);
 
       const result = await service.generate(userId, { occasion: 'casual' });
-      expect(result).toEqual(mockOutfit);
+      expect((result as unknown as Record<string, unknown>).id).toBe(String(mockOutfit._id));
+      expect((result as unknown as Record<string, unknown>).name).toBe('Outfit generado');
+      expect((result as unknown as Record<string, unknown>).garments).toEqual([]);
       expect(mockWeatherService.getByLocation).not.toHaveBeenCalled();
     });
 

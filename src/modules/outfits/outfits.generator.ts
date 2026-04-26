@@ -5,8 +5,17 @@ import { WardrobeItem, WardrobeItemDocument } from '../wardrobe/schemas/wardrobe
 import { StyleProfileDocument } from '../style-profile/schemas/style-profile.schema';
 import { WeatherData } from '../weather/weather.service';
 
+export interface OutfitGarment {
+  garmentId: string;
+  thumbnailUrl: string;
+  type: string;
+  color: string;
+  style: string;
+}
+
 export interface OutfitComposition {
   items: { wardrobeItemId: Types.ObjectId; slot: string }[];
+  garments: OutfitGarment[];
   aiModel: string;
 }
 
@@ -39,6 +48,19 @@ export class OutfitsGenerator {
       }
     }
 
-    return { items: composition, aiModel: 'rule-based-v1' };
+    const garments: OutfitGarment[] = composition.map((entry) => {
+      const garment = items.find(
+        (i) => String(i._id) === String(entry.wardrobeItemId),
+      );
+      return {
+        garmentId: String(entry.wardrobeItemId),
+        thumbnailUrl: garment?.imageProcessedUrl || garment?.imageUrl || '',
+        type: garment?.type || '',
+        color: garment?.color || '',
+        style: entry.slot,
+      };
+    });
+
+    return { items: composition, garments, aiModel: 'rule-based-v1' };
   }
 }

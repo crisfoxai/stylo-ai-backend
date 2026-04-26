@@ -35,7 +35,7 @@ export class OutfitsService {
       styleProfile,
     );
 
-    return this.outfitModel.create({
+    const outfitDoc = await this.outfitModel.create({
       userId: new Types.ObjectId(userId),
       occasion: dto.occasion,
       mood: dto.mood,
@@ -43,6 +43,17 @@ export class OutfitsService {
       items: composition.items,
       aiModel: composition.aiModel,
     });
+
+    const base = typeof (outfitDoc as unknown as { toJSON?: () => object }).toJSON === 'function'
+      ? (outfitDoc as unknown as { toJSON: () => object }).toJSON()
+      : { ...outfitDoc };
+
+    return {
+      ...base,
+      id: String(outfitDoc._id),
+      name: 'Outfit generado',
+      garments: composition.garments,
+    } as unknown as OutfitDocument;
   }
 
   async addFavorite(userId: string, outfitId: string): Promise<void> {
