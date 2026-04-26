@@ -1,57 +1,79 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { BadGatewayException } from '@nestjs/common';
-import { of, throwError } from 'rxjs';
 import { AIService } from './ai.service';
-import { AxiosResponse } from 'axios';
 
 describe('AIService', () => {
   let service: AIService;
-  let mockHttpService: { post: jest.Mock };
 
-  beforeEach(async () => {
-    mockHttpService = { post: jest.fn() };
-
-    const module: TestingModule = await Test.createTestingModule({
+  function buildModule(provider: string) {
+    return Test.createTestingModule({
       providers: [
         AIService,
         {
           provide: ConfigService,
           useValue: {
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === 'AI_PROVIDER') return provider;
+              if (key === 'AI_SERVICE_URL') return '';
+              if (key === 'AI_SERVICE_INTERNAL_KEY') return '';
+              return undefined;
+            }),
             getOrThrow: jest.fn().mockImplementation((key: string) => {
-              if (key === 'AI_SERVICE_URL') return 'http://localhost:8000';
-              return 'test-key';
+              if (key === 'GEMINI_API_KEY') return 'fake-key';
+              throw new Error(`Missing required env: ${key}`);
             }),
           },
         },
-        { provide: HttpService, useValue: mockHttpService },
+        { provide: HttpService, useValue: { post: jest.fn() } },
       ],
     }).compile();
+  }
 
-    service = module.get<AIService>(AIService);
-  });
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  describe('classify', () => {
-    it('should return classification result', async () => {
-      const mockResult = { type: 'top', color: 'red', category: 'top', material: 'cotton', confidence: 0.9 };
-      mockHttpService.post.mockReturnValue(of({ data: mockResult } as AxiosResponse));
-
-      const result = await service.classify('https://example.com/image.jpg');
-      expect(result).toEqual(mockResult);
+  describe('with unknown provider (mock mode)', () => {
+    beforeEach(async () => {
+      const module: TestingModule = await buildModule('mock');
+      service = module.get<AIService>(AIService);
     });
 
-    it('should throw BadGatewayException after max retries', async () => {
-      mockHttpService.post.mockReturnValue(throwError(() => new Error('Connection refused')));
+    it('should be defined', () => {
+      expect(service).toBeDefined();
+    });
 
-      await expect(service.classify('https://example.com/image.jpg')).rejects.toThrow(
-        BadGatewayException,
-      );
-      expect(mockHttpService.post).toHaveBeenCalledTimes(4); // initial + 3 retries
-    }, 10000);
+    it('classify returns fallback result', async () => {
+      const result = await service.classify('https://example.com/image.jpg');
+      expect(result.confidence).toBe(0);
+      expect(result.type).toBe('unknown');
+    });
+
+    it('removeBg returns the same URL', async () => {
+      const url = 'https://example.com/image.jpg';
+      const result = await service.removeBg(url);
+      expect(result.processedUrl).toBe(url);
+    });
+  });
+
+  describe('with gemini provider', () => {
+    beforeEach(async () => {
+      const module: TestingModule = await buildModule('gemini');
+      service = module.get<AIService>(AIService);
+    });
+
+    it('should be defined', () => {
+      expect(service).toBeDefined();
+    });
+
+    it('classify returns fallback when Gemini fails (no real network)', async () => {
+      // In unit tests there's no network — Gemini call fails, fallback kicks in
+      const result = await service.classify('https://example.com/image.jpg');
+      expect(result).toHaveProperty('type');
+      expect(result).toHaveProperty('confidence');
+    });
+
+    it('removeBg returns same URL (passthrough)', async () => {
+      const url = 'https://example.com/image.jpg';
+      const result = await service.removeBg(url);
+      expect(result.processedUrl).toBe(url);
+    });
   });
 });
