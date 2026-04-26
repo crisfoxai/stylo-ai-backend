@@ -33,6 +33,7 @@ export class OutfitsService {
       dto.mood,
       weather,
       styleProfile,
+      dto.excludeIds,
     );
 
     const outfitDoc = await this.outfitModel.create({

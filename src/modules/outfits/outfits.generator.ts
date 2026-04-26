@@ -33,6 +33,7 @@ export class OutfitsGenerator {
     _mood: string | undefined,
     _weather: WeatherData | undefined,
     _styleProfile: StyleProfileDocument | null,
+    excludeIds?: string[],
   ): Promise<OutfitComposition> {
     const items = await this.itemModel
       .find({ userId: new Types.ObjectId(userId), status: 'ready', archived: false })
@@ -41,7 +42,9 @@ export class OutfitsGenerator {
     const composition: { wardrobeItemId: Types.ObjectId; slot: string }[] = [];
 
     for (const slot of SLOTS) {
-      const candidates = items.filter((i) => i.type === slot);
+      const candidates = items
+        .filter((i) => i.type === slot)
+        .filter((i) => !excludeIds?.includes(String(i._id)));
       if (candidates.length > 0) {
         const picked = candidates[Math.floor(Math.random() * candidates.length)];
         composition.push({ wardrobeItemId: picked._id as Types.ObjectId, slot });
