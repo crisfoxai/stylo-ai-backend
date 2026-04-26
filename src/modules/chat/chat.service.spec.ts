@@ -9,17 +9,17 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { WardrobeService } from '../wardrobe/wardrobe.service';
 import { StyleProfileService } from '../style-profile/style-profile.service';
 
-jest.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: jest.fn().mockImplementation(() => ({
-      messages: {
-        create: jest.fn().mockResolvedValue({
-          content: [{ type: 'text', text: 'Test reply from AI stylist' }],
-        }),
-      },
-    })),
-  };
+const mockSendMessage = jest.fn().mockResolvedValue({
+  response: { text: () => 'Test reply from AI stylist' },
 });
+const mockStartChat = jest.fn().mockReturnValue({ sendMessage: mockSendMessage });
+const mockGetGenerativeModel = jest.fn().mockReturnValue({ startChat: mockStartChat });
+
+jest.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+    getGenerativeModel: mockGetGenerativeModel,
+  })),
+}));
 
 describe('ChatService', () => {
   let service: ChatService;
@@ -31,6 +31,11 @@ describe('ChatService', () => {
   const userId = new Types.ObjectId().toString();
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockSendMessage.mockResolvedValue({ response: { text: () => 'Test reply from AI stylist' } });
+    mockStartChat.mockReturnValue({ sendMessage: mockSendMessage });
+    mockGetGenerativeModel.mockReturnValue({ startChat: mockStartChat });
+
     const chainMock = { sort: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([]) };
     mockChatModel = {
       find: jest.fn().mockReturnValue(chainMock),
@@ -51,7 +56,13 @@ describe('ChatService', () => {
       providers: [
         ChatService,
         { provide: getModelToken(ChatMessage.name), useValue: mockChatModel },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('test-key') } },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('test-key'),
+            getOrThrow: jest.fn().mockReturnValue('test-gemini-key'),
+          },
+        },
         { provide: SubscriptionsService, useValue: mockSubscriptionsService },
         { provide: WardrobeService, useValue: mockWardrobeService },
         { provide: StyleProfileService, useValue: mockStyleProfileService },
@@ -66,18 +77,18 @@ describe('ChatService', () => {
   });
 
   describe('sendMessage', () => {
-    it('should return reply for pro plan', async () => {
+    it('should return reply using Gemini Flash for pro plan', async () => {
       const result = await service.sendMessage(userId, { message: 'What should I wear?' });
       expect(result.reply).toBe('Test reply from AI stylist');
       expect(result.sessionId).toBeDefined();
-      expect(result.model).toBe('claude-sonnet-4-6');
+      expect(result.model).toBe('gemini-2.5-flash');
       expect(mockChatModel.insertMany).toHaveBeenCalled();
     });
 
-    it('should use haiku for stylist plan', async () => {
+    it('should use Gemini Flash for stylist plan and check rate limit', async () => {
       mockSubscriptionsService.getByUserId.mockResolvedValue({ plan: 'stylist', chatMessagesUsedThisMonth: 5 });
       const result = await service.sendMessage(userId, { message: 'What to wear?' });
-      expect(result.model).toBe('claude-haiku-4-5-20251001');
+      expect(result.model).toBe('gemini-2.5-flash');
       expect(mockSubscriptionsService.checkAndIncrementUsage).toHaveBeenCalledWith(userId, 'chat');
     });
 
@@ -89,6 +100,24 @@ describe('ChatService', () => {
     it('should reuse sessionId when provided', async () => {
       const result = await service.sendMessage(userId, { message: 'Hi', sessionId: 'existing-session' });
       expect(result.sessionId).toBe('existing-session');
+    });
+
+    it('should pass history to Gemini startChat with model role', async () => {
+      // Mock returns descending (most recent first), service calls .reverse() to get chronological
+      const historyMessages = [
+        { role: 'assistant', content: 'Hi!', sessionId: 'test', userId },
+        { role: 'user', content: 'Hello', sessionId: 'test', userId },
+      ];
+      const chainMock = { sort: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(historyMessages) };
+      mockChatModel.find.mockReturnValue(chainMock);
+
+      await service.sendMessage(userId, { message: 'Follow-up', sessionId: 'test' });
+      expect(mockStartChat).toHaveBeenCalledWith({
+        history: [
+          { role: 'user', parts: [{ text: 'Hello' }] },
+          { role: 'model', parts: [{ text: 'Hi!' }] },
+        ],
+      });
     });
   });
 
