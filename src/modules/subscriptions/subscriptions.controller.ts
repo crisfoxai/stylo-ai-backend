@@ -30,7 +30,7 @@ export class SubscriptionsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Dev-only: upgrade subscription tier (not available in production)' })
   async devUpgrade(@CurrentUser() user: UserDocument, @Body() dto: DevUpgradeDto) {
-    if (process.env.NODE_ENV === 'production') throw new NotFoundException();
+    if (process.env.DEV_ENDPOINTS_ENABLED !== 'true') throw new NotFoundException();
     return this.subscriptionsService.devUpgrade(String(user._id), dto);
   }
 }
