@@ -14,7 +14,7 @@ export class R2Service {
   private readonly logger = new Logger(R2Service.name);
   private readonly client: S3Client;
   private readonly endpoint: string;
-  private readonly publicUrl: string | undefined;
+  private readonly publicBaseUrl: string | undefined;
   private readonly mockMode: boolean;
 
   constructor(private readonly configService: ConfigService) {
@@ -24,7 +24,7 @@ export class R2Service {
     const accountId = configService.getOrThrow<string>('R2_ACCOUNT_ID');
     this.endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
     // Optional public CDN URL (e.g. https://pub-XXX.r2.dev) — used as the returned URL for uploaded objects
-    this.publicUrl = configService.get<string>('R2_PUBLIC_URL');
+    this.publicBaseUrl = configService.get<string>('R2_PUBLIC_BASE_URL');
 
     if (this.mockMode) {
       this.logger.warn('R2Service running in MOCK mode (STORAGE_MOCK=true)');
@@ -38,7 +38,7 @@ export class R2Service {
           secretAccessKey: configService.getOrThrow<string>('R2_SECRET_ACCESS_KEY'),
         },
       });
-      this.logger.log(`R2Service initialized — public URL: ${this.publicUrl ?? this.endpoint}`);
+      this.logger.log(`R2Service initialized — public URL: ${this.publicBaseUrl ?? this.endpoint}`);
     }
   }
 
@@ -66,8 +66,8 @@ export class R2Service {
     );
 
     // Use public CDN URL if configured (R2 public bucket), otherwise use S3 endpoint URL
-    return this.publicUrl
-      ? `${this.publicUrl}/${key}`
+    return this.publicBaseUrl
+      ? `${this.publicBaseUrl}/${key}`
       : `${this.endpoint}/${bucket}/${key}`;
   }
 
