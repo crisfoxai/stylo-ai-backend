@@ -7,6 +7,7 @@ import { WardrobeItem, WardrobeItemSchema } from '../wardrobe/schemas/wardrobe-i
 import { AIModule } from '../ai/ai.module';
 import { StorageModule } from '../storage/storage.module';
 import { AuthModule } from '../auth/auth.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AuthModule } from '../auth/auth.module';
     AIModule,
     StorageModule,
     AuthModule,
+    SubscriptionsModule,
   ],
   controllers: [TryonController],
   providers: [TryonService],

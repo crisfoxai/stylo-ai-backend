@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
+import Replicate from 'replicate';
 
 export interface ClassifyResult {
   name: string;
@@ -51,6 +52,7 @@ export class AIService {
   private readonly logger = new Logger(AIService.name);
   private readonly provider: string;
   private geminiClient?: GoogleGenerativeAI;
+  private replicateClient?: Replicate;
 
   // Legacy HTTP proxy fields (used when AI_PROVIDER=custom)
   private readonly baseUrl: string;
@@ -71,6 +73,12 @@ export class AIService {
     } else {
       this.logger.warn(`AIService provider="${this.provider}" — falling back to mock`);
     }
+
+    const replicateToken = configService.get<string>('REPLICATE_API_TOKEN');
+    if (replicateToken) {
+      this.replicateClient = new Replicate({ auth: replicateToken });
+      this.logger.log('AIService: Replicate client initialized');
+    }
   }
 
   async classify(imageUrl: string): Promise<ClassifyResult> {
@@ -86,10 +94,31 @@ export class AIService {
     return { processedUrl: imageUrl };
   }
 
-  async tryon(userPhotoUrl: string, itemUrls: string[]): Promise<TryonResult> {
-    if (this.provider === 'custom' && this.baseUrl) {
-      return this.callWithRetry<TryonResult>('/tryon', { userPhotoUrl, itemUrls });
+  async tryon(userPhotoUrl: string, garmentUrls: string[], garmentDescription = 'garment'): Promise<TryonResult> {
+    if (this.replicateClient) {
+      try {
+        const output = await this.replicateClient.run(
+          'viktorfa/idm-vton',
+          {
+            input: {
+              human_img: userPhotoUrl,
+              garm_img: garmentUrls[0],
+              garment_des: garmentDescription,
+            },
+          },
+        ) as unknown as string;
+        return { resultUrl: output };
+      } catch (err) {
+        this.logger.error(`Replicate tryon failed: ${(err as Error).message}`);
+        return { resultUrl: userPhotoUrl };
+      }
     }
+
+    if (this.provider === 'custom' && this.baseUrl) {
+      return this.callWithRetry<TryonResult>('/tryon', { userPhotoUrl, garmentUrls });
+    }
+
+    this.logger.warn('Replicate not configured — returning passthrough');
     return { resultUrl: userPhotoUrl };
   }
 

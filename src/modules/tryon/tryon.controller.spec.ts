@@ -33,7 +33,7 @@ describe('TryonController', () => {
     mockService.tryon.mockResolvedValue(mockResult);
 
     const file = { originalname: 'photo.jpg', buffer: Buffer.from(''), mimetype: 'image/jpeg' } as Express.Multer.File;
-    const result = await controller.tryon(mockUser as never, file, { outfitId: 'outfit-id', itemIds: [] });
+    const result = await controller.tryon(mockUser as never, file, { garmentId: 'garment-id', outfitId: 'outfit-id' });
     expect(result.resultUrl).toBeDefined();
   });
 });

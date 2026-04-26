@@ -19,6 +19,7 @@ import { HealthModule } from './modules/health/health.module';
 import { StyleProfileModule } from './modules/style-profile/style-profile.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -43,7 +44,12 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
         AI_SERVICE_INTERNAL_KEY: Joi.string().optional(),
         OPENWEATHER_API_KEY: Joi.string().required(),
         APPLE_SHARED_SECRET: Joi.string().optional(),
+        APPLE_BUNDLE_ID: Joi.string().optional(),
+        APPLE_ENVIRONMENT: Joi.string().valid('sandbox', 'production').default('sandbox'),
         GOOGLE_PLAY_SA_JSON: Joi.string().optional(),
+        GOOGLE_PLAY_PACKAGE_NAME: Joi.string().optional(),
+        ANTHROPIC_API_KEY: Joi.string().optional(),
+        REPLICATE_API_TOKEN: Joi.string().optional(),
         SENTRY_DSN_BACKEND: Joi.string().optional(),
       }),
     }),
@@ -75,6 +81,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
     StyleProfileModule,
     FavoritesModule,
     FeedbackModule,
+    ChatModule,
   ],
 })
 export class AppModule implements NestModule {

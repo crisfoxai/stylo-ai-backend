@@ -25,9 +25,9 @@ export class TryonController {
   constructor(private readonly tryonService: TryonService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('userPhoto'))
+  @UseInterceptors(FileInterceptor('photo'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Virtual try-on (premium gated)' })
+  @ApiOperation({ summary: 'Virtual try-on with IDM-VTON (Pro/Pro Unlimited only)' })
   async tryon(
     @CurrentUser() user: UserDocument,
     @UploadedFile(
@@ -41,13 +41,11 @@ export class TryonController {
     file: Express.Multer.File,
     @Body() dto: TryonDto,
   ) {
-    const isPremium = false; // TODO: read from subscription when SubscriptionsService is wired
     return this.tryonService.tryon(
       String(user._id),
       file,
+      dto.garmentId,
       dto.outfitId,
-      dto.itemIds ?? [],
-      isPremium,
     );
   }
 }

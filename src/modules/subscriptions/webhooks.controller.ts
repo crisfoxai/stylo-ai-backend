@@ -10,8 +10,8 @@ export class WebhooksController {
   @Post('apple')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Apple App Store Server Notifications v2' })
-  async appleWebhook(@Body() payload: Record<string, unknown>) {
-    await this.subscriptionsService.handleAppleWebhook(payload);
+  async appleWebhook(@Body() payload: { signedPayload?: string }) {
+    await this.subscriptionsService.handleAppleWebhook(payload.signedPayload ?? '');
     return { ok: true };
   }
 

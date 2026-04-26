@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",
     "@google/generative-ai": "^0.24.1",
@@ -39,10 +40,13 @@
     "compression": "^1.7.5",
     "express": "^4.21.2",
     "firebase-admin": "^13.3.0",
+    "googleapis": "^171.4.0",
     "joi": "^17.13.3",
+    "jose": "^6.2.2",
     "mongoose": "^8.13.2",
     "multer": "2.1.1",
     "reflect-metadata": "^0.2.2",
+    "replicate": "^1.4.0",
     "rxjs": "^7.8.2",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0"
