@@ -1,9 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
 import { PushToken, PushTokenDocument } from './schemas/push-token.schema';
 import { RegisterTokenDto } from './dto/notification.dto';
+
+function assertObjectId(value: string, field = 'id'): void {
+  if (!Types.ObjectId.isValid(value)) {
+    throw new BadRequestException({ error: 'INVALID_ID', field });
+  }
+}
 
 @Injectable()
 export class NotificationsService {
@@ -14,6 +20,7 @@ export class NotificationsService {
   ) {}
 
   async registerToken(userId: string, dto: RegisterTokenDto): Promise<PushTokenDocument> {
+    assertObjectId(userId, 'userId');
     return this.pushTokenModel.findOneAndUpdate(
       { userId: new Types.ObjectId(userId), token: dto.token },
       {
@@ -29,6 +36,7 @@ export class NotificationsService {
   }
 
   async unregisterToken(userId: string, token: string): Promise<void> {
+    assertObjectId(userId, 'userId');
     await this.pushTokenModel.deleteOne({ userId: new Types.ObjectId(userId), token });
   }
 

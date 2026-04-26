@@ -1,12 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-
-function assertObjectId(value: string, field = 'id'): void {
-  if (!Types.ObjectId.isValid(value)) {
-    throw new BadRequestException({ error: 'INVALID_ID', field });
-  }
-}
 import { Outfit, OutfitDocument } from './schemas/outfit.schema';
 import { FavoriteOutfit, FavoriteOutfitDocument } from './schemas/favorite-outfit.schema';
 import { WornEntry, WornEntryDocument } from './schemas/worn-entry.schema';
@@ -14,6 +8,12 @@ import { GenerateOutfitDto, OutfitHistoryDto } from './dto/outfit.dto';
 import { OutfitsGenerator } from './outfits.generator';
 import { WeatherService } from '../weather/weather.service';
 import { UsersService } from '../users/users.service';
+
+function assertObjectId(value: string, field = 'id'): void {
+  if (!Types.ObjectId.isValid(value)) {
+    throw new BadRequestException({ error: 'INVALID_ID', field });
+  }
+}
 
 @Injectable()
 export class OutfitsService {
@@ -27,6 +27,7 @@ export class OutfitsService {
   ) {}
 
   async generate(userId: string, dto: GenerateOutfitDto): Promise<OutfitDocument> {
+    assertObjectId(userId, 'userId');
     const weather =
       dto.lat !== undefined && dto.lon !== undefined
         ? await this.weatherService.getByLocation(dto.lat, dto.lon)
@@ -64,6 +65,8 @@ export class OutfitsService {
   }
 
   async addFavorite(userId: string, outfitId: string): Promise<void> {
+    assertObjectId(userId, 'userId');
+    assertObjectId(outfitId, 'outfitId');
     await this.favoriteModel.updateOne(
       { userId: new Types.ObjectId(userId), outfitId: new Types.ObjectId(outfitId) },
       { $setOnInsert: { userId: new Types.ObjectId(userId), outfitId: new Types.ObjectId(outfitId) } },
@@ -72,6 +75,8 @@ export class OutfitsService {
   }
 
   async removeFavorite(userId: string, outfitId: string): Promise<void> {
+    assertObjectId(userId, 'userId');
+    assertObjectId(outfitId, 'outfitId');
     await this.favoriteModel.deleteOne({
       userId: new Types.ObjectId(userId),
       outfitId: new Types.ObjectId(outfitId),
@@ -79,6 +84,7 @@ export class OutfitsService {
   }
 
   async getFavorites(userId: string): Promise<FavoriteOutfitDocument[]> {
+    assertObjectId(userId, 'userId');
     return this.favoriteModel
       .find({ userId: new Types.ObjectId(userId) })
       .populate('outfitId')
@@ -86,6 +92,7 @@ export class OutfitsService {
   }
 
   async markWorn(userId: string, outfitId: string): Promise<WornEntryDocument> {
+    assertObjectId(userId, 'userId');
     assertObjectId(outfitId, 'outfitId');
     const outfit = await this.outfitModel.findOne({
       _id: new Types.ObjectId(outfitId),
@@ -101,6 +108,7 @@ export class OutfitsService {
   }
 
   async findOne(userId: string, outfitId: string): Promise<Record<string, unknown>> {
+    assertObjectId(userId, 'userId');
     assertObjectId(outfitId, 'outfitId');
     const outfit = await this.outfitModel.findOne({
       _id: new Types.ObjectId(outfitId),
@@ -114,6 +122,7 @@ export class OutfitsService {
   }
 
   async listByUser(userId: string, page = 1, limit = 20): Promise<OutfitDocument[]> {
+    assertObjectId(userId, 'userId');
     const skip = (page - 1) * limit;
     return this.outfitModel
       .find({ userId: new Types.ObjectId(userId) })
@@ -124,6 +133,7 @@ export class OutfitsService {
   }
 
   async getHistory(userId: string, dto: OutfitHistoryDto): Promise<WornEntryDocument[]> {
+    assertObjectId(userId, 'userId');
     const filter: Record<string, unknown> = { userId: new Types.ObjectId(userId) };
 
     if (dto.month) {
