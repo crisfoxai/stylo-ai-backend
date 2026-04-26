@@ -12,3 +12,10 @@ export class VerifyReceiptDto {
   @IsNotEmpty()
   receipt!: string;
 }
+
+export class DevUpgradeDto {
+  @ApiProperty({ enum: ['stylist', 'pro', 'pro_unlimited'] })
+  @IsString()
+  @IsIn(['stylist', 'pro', 'pro_unlimited'])
+  plan!: string;
+}

@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import axios from 'axios';
 import { Subscription, SubscriptionDocument } from './schemas/subscription.schema';
-import { VerifyReceiptDto } from './dto/subscription.dto';
+import { VerifyReceiptDto, DevUpgradeDto } from './dto/subscription.dto';
 import { PLAN_LIMITS, PRODUCT_TIER_MAP, PlanTier } from './subscription.limits';
 
 function startOfMonth(date = new Date()): Date {
@@ -175,6 +175,25 @@ export class SubscriptionsService {
           productId,
           originalTransactionId,
           expiresAt,
+          periodStart: startOfMonth(),
+        },
+      },
+      { upsert: true, new: true },
+    );
+    return sub as SubscriptionDocument;
+  }
+
+  async devUpgrade(userId: string, dto: DevUpgradeDto): Promise<SubscriptionDocument> {
+    const sub = await this.subscriptionModel.findOneAndUpdate(
+      { userId: new Types.ObjectId(userId) },
+      {
+        $set: {
+          plan: dto.plan,
+          status: 'active',
+          expiresAt: new Date('2027-12-31'),
+          tryonUsedThisMonth: 0,
+          chatMessagesUsedThisMonth: 0,
+          platform: 'dev',
           periodStart: startOfMonth(),
         },
       },
