@@ -92,6 +92,18 @@ export class OutfitsService {
     });
   }
 
+  async findOne(userId: string, outfitId: string): Promise<Record<string, unknown>> {
+    const outfit = await this.outfitModel.findOne({
+      _id: new Types.ObjectId(outfitId),
+      userId: new Types.ObjectId(userId),
+    }).lean();
+
+    if (!outfit) throw new NotFoundException({ error: 'NOT_FOUND' });
+
+    const garments = await this.generator.populateGarments(outfit.items as { wardrobeItemId: Types.ObjectId; slot: string }[]);
+    return { ...outfit, id: String(outfit._id), name: 'Outfit', garments };
+  }
+
   async listByUser(userId: string, page = 1, limit = 20): Promise<OutfitDocument[]> {
     const skip = (page - 1) * limit;
     return this.outfitModel

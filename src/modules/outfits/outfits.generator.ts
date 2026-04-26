@@ -48,7 +48,26 @@ export class OutfitsGenerator {
       }
     }
 
-    const garments: OutfitGarment[] = composition.map((entry) => {
+    const garments = this.buildGarments(composition, items);
+
+    return { items: composition, garments, aiModel: 'rule-based-v1' };
+  }
+
+  async populateGarments(
+    compositionItems: { wardrobeItemId: Types.ObjectId; slot: string }[],
+  ): Promise<OutfitGarment[]> {
+    if (!compositionItems?.length) return [];
+
+    const ids = compositionItems.map((e) => e.wardrobeItemId);
+    const items = await this.itemModel.find({ _id: { $in: ids } }).lean();
+    return this.buildGarments(compositionItems, items);
+  }
+
+  private buildGarments(
+    compositionItems: { wardrobeItemId: Types.ObjectId; slot: string }[],
+    items: { _id: unknown; imageProcessedUrl?: string; imageUrl?: string; type?: string; color?: string }[],
+  ): OutfitGarment[] {
+    return compositionItems.map((entry) => {
       const garment = items.find(
         (i) => String(i._id) === String(entry.wardrobeItemId),
       );
@@ -60,7 +79,5 @@ export class OutfitsGenerator {
         style: entry.slot,
       };
     });
-
-    return { items: composition, garments, aiModel: 'rule-based-v1' };
   }
 }

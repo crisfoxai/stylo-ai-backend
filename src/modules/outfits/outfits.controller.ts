@@ -36,6 +36,12 @@ export class OutfitsController {
     return this.outfitsService.listByUser(String(user._id), page, limit);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get single outfit by id' })
+  async findOne(@CurrentUser() user: UserDocument, @Param('id') id: string) {
+    return this.outfitsService.findOne(String(user._id), id);
+  }
+
   @Post('generate')
   @ApiOperation({ summary: 'Generate an outfit suggestion' })
   async generate(@CurrentUser() user: UserDocument, @Body() dto: GenerateOutfitDto) {
