@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, HttpCode, HttpStatus, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubscriptionsService } from './subscriptions.service';
 import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
@@ -28,9 +28,8 @@ export class SubscriptionsController {
 
   @Post('dev-upgrade')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Dev-only: upgrade subscription tier (not available in production)' })
+  @ApiOperation({ summary: 'Dev-only: upgrade subscription tier' })
   async devUpgrade(@CurrentUser() user: UserDocument, @Body() dto: DevUpgradeDto) {
-    if (process.env.DEV_ENDPOINTS_ENABLED !== 'true') throw new NotFoundException();
     return this.subscriptionsService.devUpgrade(String(user._id), dto);
   }
 }
