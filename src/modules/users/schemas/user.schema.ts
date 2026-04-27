@@ -26,13 +26,13 @@ export class User {
   @Prop({ default: () => Math.random().toString(36).slice(2, 8).toUpperCase(), unique: true, sparse: true })
   referralCode!: string;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   referredBy?: string | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   referredByCode?: string | null;
 
-  @Prop({ default: null })
+  @Prop({ type: Date, default: null })
   premiumAccessUntil?: Date | null;
 }
 
