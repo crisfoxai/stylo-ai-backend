@@ -15,7 +15,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserDocument } from './schemas/user.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
 
-function serializeUser(user: UserDocument, hasStyleProfile: boolean) {
+function serializeUser(
+  user: UserDocument,
+  hasStyleProfile: boolean,
+  tryonStats: { tryonsUsedThisMonth: number; tryonsLimitThisMonth: number | null; tryonsResetAt: string | null },
+) {
   const parts = (user.displayName ?? '').trim().split(/\s+/);
   return {
     id: String(user._id),
@@ -25,6 +29,9 @@ function serializeUser(user: UserDocument, hasStyleProfile: boolean) {
     avatarUrl: user.photoUrl ?? null,
     hasStyleProfile,
     createdAt: user.createdAt,
+    tryonsUsedThisMonth: tryonStats.tryonsUsedThisMonth,
+    tryonsLimitThisMonth: tryonStats.tryonsLimitThisMonth,
+    tryonsResetAt: tryonStats.tryonsResetAt,
   };
 }
 
@@ -38,8 +45,11 @@ export class UsersController {
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
   async getMe(@CurrentUser() user: UserDocument) {
-    const styleProfile = await this.usersService.getStyleProfile(String(user._id));
-    return serializeUser(user, styleProfile !== null);
+    const [styleProfile, tryonStats] = await Promise.all([
+      this.usersService.getStyleProfile(String(user._id)),
+      this.usersService.getTryonStats(String(user._id)),
+    ]);
+    return serializeUser(user, styleProfile !== null, tryonStats);
   }
 
   @Patch('me')

@@ -111,33 +111,94 @@ export class AIService {
     return { processedUrl: imageUrl };
   }
 
-  async tryon(userPhotoUrl: string, garmentUrls: string[], garmentDescription = 'garment'): Promise<TryonResult> {
-    if (this.replicateClient) {
-      try {
-        const output = await this.replicateClient.run(
-          'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
-          {
-            input: {
-              human_img: userPhotoUrl,
-              garm_img: garmentUrls[0],
-              garment_des: garmentDescription,
-            },
-          },
-        );
-        // Replicate returns a FileOutput object — convert to URL string
-        return { resultUrl: String(output) };
-      } catch (err) {
-        this.logger.error(`Replicate tryon failed: ${(err as Error).message}`);
-        return { resultUrl: userPhotoUrl };
+  async tryon(
+    userPhotoUrl: string,
+    garmentUrls: string[],
+    garmentDescription = 'garment',
+    category = 'upper_body',
+  ): Promise<TryonResult> {
+    if (!this.replicateClient) {
+      if (this.provider === 'custom' && this.baseUrl) {
+        return this.callWithRetry<TryonResult>('/tryon', { userPhotoUrl, garmentUrls, category });
       }
+      throw new Error('Replicate not configured — tryon unavailable');
     }
 
-    if (this.provider === 'custom' && this.baseUrl) {
-      return this.callWithRetry<TryonResult>('/tryon', { userPhotoUrl, garmentUrls });
+    return this.runVtonWithRetry(userPhotoUrl, garmentUrls[0], garmentDescription, category);
+  }
+
+  private async runVtonWithRetry(
+    humanImageUrl: string,
+    garmentImageUrl: string,
+    garmentDes: string,
+    category: string,
+  ): Promise<TryonResult> {
+    try {
+      return await this.runSingleVton(humanImageUrl, garmentImageUrl, garmentDes, category);
+    } catch (err) {
+      this.logger.warn(`[tryon] First attempt failed, retrying in 2s: ${(err as Error).message}`);
+      await new Promise((r) => setTimeout(r, 2000));
+      return await this.runSingleVton(humanImageUrl, garmentImageUrl, garmentDes, category);
+    }
+  }
+
+  private async runSingleVton(
+    humanImageUrl: string,
+    garmentImageUrl: string,
+    garmentDes: string,
+    category: string,
+  ): Promise<TryonResult> {
+    const input = {
+      human_img: humanImageUrl,
+      garm_img: garmentImageUrl,
+      garment_des: garmentDes,
+      category,
+      is_checked: true,
+      is_checked_crop: true,
+      auto_mask: true,
+      auto_crop: false,
+      denoise_steps: 30,
+      seed: 42,
+    };
+
+    this.logger.log(`[tryon] Creating prediction. input=${JSON.stringify({ ...input, human_img: '(url)', garm_img: '(url)' })}`);
+
+    const prediction = await this.replicateClient!.predictions.create({
+      version: '0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
+      input,
+    });
+
+    this.logger.log(`[tryon] Prediction created id=${prediction.id} status=${prediction.status}`);
+
+    const resultUrl = await this.pollPrediction(prediction.id);
+    return { resultUrl };
+  }
+
+  private async pollPrediction(predictionId: string): Promise<string> {
+    const maxAttempts = 60;
+    const delayMs = 2000;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const prediction = await this.replicateClient!.predictions.get(predictionId);
+      this.logger.log(`[tryon] poll attempt=${attempt} status=${prediction.status}`);
+
+      if (prediction.status === 'succeeded') {
+        const output = prediction.output;
+        const imageUrl = Array.isArray(output) ? String(output[0]) : String(output);
+        if (!imageUrl || imageUrl === 'null' || imageUrl === 'undefined') {
+          throw new Error('Replicate returned empty output');
+        }
+        return imageUrl;
+      }
+
+      if (prediction.status === 'failed' || prediction.status === 'canceled') {
+        throw new Error(`Replicate prediction ${prediction.status}: ${String(prediction.error ?? 'unknown error')}`);
+      }
+
+      await new Promise((r) => setTimeout(r, delayMs));
     }
 
-    this.logger.warn('Replicate not configured — returning passthrough');
-    return { resultUrl: userPhotoUrl };
+    throw new Error('Replicate prediction timed out after 2 minutes');
   }
 
   private async classifyWithGemini(imageUrl: string): Promise<ClassifyResult> {

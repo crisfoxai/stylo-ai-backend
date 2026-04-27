@@ -196,6 +196,40 @@ export class SubscriptionsService {
     return sub as SubscriptionDocument;
   }
 
+  async getTryonStats(userId: string): Promise<{
+    tryonsUsedThisMonth: number;
+    tryonsLimitThisMonth: number | null;
+    tryonsResetAt: string | null;
+  }> {
+    const sub = await this.subscriptionModel.findOne({ userId: new Types.ObjectId(userId) }).lean();
+
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const resetNeeded = !sub?.periodStart || (sub.periodStart as Date) < monthStart;
+    const used = resetNeeded ? 0 : (sub?.tryonUsedThisMonth ?? 0);
+
+    const userDoc = await this.userModel.findById(userId).lean();
+    const hasPremiumBonus = !!(userDoc?.premiumAccessUntil && userDoc.premiumAccessUntil > now);
+    const plan = hasPremiumBonus ? 'pro' : ((sub?.plan ?? 'free') as PlanTier);
+    const effectivePlan = plan in PLAN_LIMITS ? plan : 'free';
+    const limit = PLAN_LIMITS[effectivePlan].tryon as number;
+
+    return {
+      tryonsUsedThisMonth: used,
+      tryonsLimitThisMonth: limit === -1 ? null : limit,
+      tryonsResetAt: nextMonth.toISOString(),
+    };
+  }
+
+  async decrementTryonCredit(userId: string): Promise<void> {
+    await this.subscriptionModel.updateOne(
+      { userId: new Types.ObjectId(userId) },
+      { $inc: { tryonUsedThisMonth: 1 } },
+    );
+  }
+
   async devUpgrade(userId: string, dto: DevUpgradeDto): Promise<SubscriptionDocument> {
     const sub = await this.subscriptionModel.findOneAndUpdate(
       { userId: new Types.ObjectId(userId) },

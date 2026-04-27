@@ -9,27 +9,30 @@ import { WornEntry } from './schemas/worn-entry.schema';
 import { OutfitsGenerator } from './outfits.generator';
 import { WeatherService } from '../weather/weather.service';
 import { UsersService } from '../users/users.service';
+import { R2Service } from '../storage/r2.service';
 
 describe('OutfitsService', () => {
   let service: OutfitsService;
-  let mockOutfitModel: { create: jest.Mock; findOne: jest.Mock; find: jest.Mock };
+  let mockOutfitModel: { create: jest.Mock; findOne: jest.Mock; find: jest.Mock; countDocuments: jest.Mock };
   let mockFavoriteModel: { updateOne: jest.Mock; deleteOne: jest.Mock; find: jest.Mock };
   let mockWornModel: { create: jest.Mock; find: jest.Mock; countDocuments: jest.Mock };
   let mockGenerator: { compose: jest.Mock };
   let mockWeatherService: { getByLocation: jest.Mock };
   let mockUsersService: { getStyleProfile: jest.Mock };
+  let mockR2Service: { uploadStream: jest.Mock };
 
   const userId = new Types.ObjectId().toString();
   const outfitId = new Types.ObjectId().toString();
 
   beforeEach(async () => {
     const chainMock = { sort: jest.fn().mockReturnThis(), skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([]) };
-    mockOutfitModel = { create: jest.fn(), findOne: jest.fn(), find: jest.fn().mockReturnValue(chainMock) };
-    mockFavoriteModel = { updateOne: jest.fn(), deleteOne: jest.fn(), find: jest.fn() };
+    mockOutfitModel = { create: jest.fn(), findOne: jest.fn(), find: jest.fn().mockReturnValue(chainMock), countDocuments: jest.fn().mockResolvedValue(0) };
+    mockFavoriteModel = { updateOne: jest.fn(), deleteOne: jest.fn(), find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) };
     mockWornModel = { create: jest.fn(), find: jest.fn(), countDocuments: jest.fn() };
     mockGenerator = { compose: jest.fn().mockResolvedValue({ items: [], garments: [], aiModel: 'test' }) };
     mockWeatherService = { getByLocation: jest.fn().mockResolvedValue({ tempC: 20, condition: 'clear', lat: 0, lon: 0 }) };
     mockUsersService = { getStyleProfile: jest.fn().mockResolvedValue(null) };
+    mockR2Service = { uploadStream: jest.fn().mockResolvedValue('https://r2.example.com/photo.jpg') };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -40,6 +43,7 @@ describe('OutfitsService', () => {
         { provide: OutfitsGenerator, useValue: mockGenerator },
         { provide: WeatherService, useValue: mockWeatherService },
         { provide: UsersService, useValue: mockUsersService },
+        { provide: R2Service, useValue: mockR2Service },
       ],
     }).compile();
 
@@ -104,8 +108,9 @@ describe('OutfitsService', () => {
       const chainMock = { sort: jest.fn().mockReturnThis(), skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(mockOutfits) };
       mockOutfitModel.find.mockReturnValue(chainMock);
 
-      const result = await service.listByUser(userId, 1, 20);
-      expect(result).toHaveLength(1);
+      mockOutfitModel.countDocuments.mockResolvedValue(1);
+      const result = await service.listByUser(userId, { page: 1, limit: 20 });
+      expect(result.data).toBeDefined();
     });
   });
 

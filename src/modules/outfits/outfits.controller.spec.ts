@@ -47,9 +47,10 @@ describe('OutfitsController', () => {
   it('list - should return paginated outfits', async () => {
     const mockOutfits = [{ _id: new Types.ObjectId(), occasion: 'casual' }];
     mockService.listByUser.mockResolvedValue(mockOutfits);
-    const result = await controller.list(mockUser as never, 1, 20);
+    const dto = { page: 1, limit: 20 };
+    const result = await controller.list(mockUser as never, dto);
     expect(result).toHaveLength(1);
-    expect(mockService.listByUser).toHaveBeenCalledWith(String(mockUser._id), 1, 20);
+    expect(mockService.listByUser).toHaveBeenCalledWith(String(mockUser._id), dto);
   });
 
   it('generate - should call service.generate', async () => {

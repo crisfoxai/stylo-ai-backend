@@ -1,4 +1,12 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  InternalServerErrorException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { createHash } from 'crypto';
@@ -8,9 +16,64 @@ import { WardrobeItem, WardrobeItemDocument } from '../wardrobe/schemas/wardrobe
 import { AIService } from '../ai/ai.service';
 import { R2Service } from '../storage/r2.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { TryonOutfitDto } from './dto/tryon.dto';
+
+const CATEGORY_MAP: Record<string, string> = {
+  top: 'upper_body',
+  bottom: 'lower_body',
+  outerwear: 'upper_body',
+  dress: 'dresses',
+};
+
+const TYPE_EN: Record<string, string> = {
+  pantalon: 'trousers',
+  remera: 'shirt',
+  vestido: 'dress',
+  campera: 'jacket',
+  saco: 'blazer',
+  falda: 'skirt',
+  zapatilla: 'sneakers',
+  zapato: 'shoes',
+  short: 'shorts',
+  bermuda: 'shorts',
+  pollera: 'skirt',
+  buzo: 'sweatshirt',
+  camiseta: 'shirt',
+  chomba: 'polo shirt',
+  tapado: 'coat',
+  abrigo: 'coat',
+};
+
+function mapCategoryToVton(mongoCategory: string): string {
+  const mapped = CATEGORY_MAP[mongoCategory];
+  if (!mapped) {
+    throw new BadRequestException(
+      `Try-on not available for category: ${mongoCategory}. Supported: top, bottom, outerwear, dress.`,
+    );
+  }
+  return mapped;
+}
+
+function buildGarmentDes(garment: {
+  color?: string;
+  fit?: string | null;
+  type?: string;
+  name?: string;
+  category?: string;
+}): string {
+  const parts: string[] = [];
+  if (garment.color) parts.push(garment.color);
+  if (garment.fit) parts.push(garment.fit);
+  const rawType = garment.type?.toLowerCase() ?? '';
+  const typeEn = (TYPE_EN[rawType] ?? rawType) || garment.name || garment.category || 'garment';
+  parts.push(typeEn);
+  return parts.join(' ');
+}
 
 @Injectable()
 export class TryonService {
+  private readonly logger = new Logger(TryonService.name);
+
   constructor(
     @InjectModel(TryonResult.name) private readonly tryonModel: Model<TryonResultDocument>,
     @InjectModel(WardrobeItem.name) private readonly wardrobeModel: Model<WardrobeItemDocument>,
@@ -25,25 +88,22 @@ export class TryonService {
     garmentId: string,
     outfitId?: string,
   ): Promise<TryonResultDocument> {
-    // Rate limit check — throws 403 if over limit
+    this.logger.log(`[tryon] userId=${userId} garmentId=${garmentId}`);
+
     await this.subscriptionsService.checkAndIncrementUsage(userId, 'tryon');
 
-    // Build cache key from photo hash + garmentId
     const photoHash = createHash('sha256').update(userPhoto.buffer).digest('hex');
-    const cacheKey = createHash('sha256')
-      .update(`${photoHash}:${garmentId}`)
-      .digest('hex');
+    const cacheKey = `${photoHash}:${garmentId}`;
 
-    // Cache hit — return existing result without calling Replicate
     const cached = await this.tryonModel.findOne({
       userId: new Types.ObjectId(userId),
       cacheKey,
     }).lean();
     if (cached) {
+      this.logger.log(`[tryon] Cache hit for userId=${userId} garmentId=${garmentId}`);
       return cached as TryonResultDocument;
     }
 
-    // Upload user photo to R2
     const photoKey = `tryon/${userId}/${uuidv4()}.jpg`;
     const bucket = this.r2Service.bucketAvatars();
     const userPhotoUrl = await this.r2Service.uploadStream(
@@ -53,25 +113,35 @@ export class TryonService {
       userPhoto.mimetype,
     );
 
-    // Get garment image URL
     const garment = await this.wardrobeModel.findOne({
       _id: new Types.ObjectId(garmentId),
       userId: new Types.ObjectId(userId),
     }).lean();
 
-    const garmentUrl = garment?.imageProcessedUrl ?? garment?.imageUrl ?? '';
-    const garmentDescription = garment?.name || `${garment?.color ?? ''} ${garment?.category ?? ''}`.trim() || 'garment';
+    if (!garment) throw new NotFoundException({ error: 'GARMENT_NOT_FOUND' });
 
-    // Call Replicate IDM-VTON
-    let resultUrl: string;
-    try {
-      const result = await this.aiService.tryon(userPhotoUrl, [garmentUrl], garmentDescription);
-      resultUrl = result.resultUrl;
-    } catch {
-      throw new ServiceUnavailableException({ error: 'TRYON_UNAVAILABLE' });
+    if (['footwear', 'accessory'].includes(garment.category)) {
+      throw new BadRequestException(
+        'El try-on de calzado y accesorios no está disponible aún. Próximamente.',
+      );
     }
 
-    // Persist result with cacheKey
+    const vtonCategory = mapCategoryToVton(garment.category);
+    const garmentDes = buildGarmentDes(garment);
+    const garmentUrl = garment.imageProcessedUrl ?? garment.imageUrl;
+
+    this.logger.log(`[tryon] garmentDes="${garmentDes}" vtonCategory="${vtonCategory}" garmentUrl=${garmentUrl}`);
+
+    let resultUrl: string;
+    try {
+      const result = await this.aiService.tryon(userPhotoUrl, [garmentUrl], garmentDes, vtonCategory);
+      resultUrl = result.resultUrl;
+      this.logger.log(`[tryon] Success resultUrl=${resultUrl}`);
+    } catch (err) {
+      this.logger.error(`[tryon] Failed: ${(err as Error).message}`);
+      throw new InternalServerErrorException('El try-on falló. Intentá de nuevo.');
+    }
+
     return this.tryonModel.create({
       userId: new Types.ObjectId(userId),
       outfitId: outfitId ? new Types.ObjectId(outfitId) : undefined,
@@ -79,5 +149,84 @@ export class TryonService {
       cacheKey,
       resultUrl,
     });
+  }
+
+  async tryonOutfit(
+    userId: string,
+    dto: TryonOutfitDto,
+  ): Promise<{ resultImageUrl: string; creditsUsed: number }> {
+    this.logger.log(`[tryon/outfit] userId=${userId} garments=${JSON.stringify(dto.garments)}`);
+
+    if (!dto.garments?.length) {
+      throw new BadRequestException('Debés seleccionar al menos una prenda.');
+    }
+
+    const SUPPORTED = ['top', 'bottom', 'outerwear', 'dress'];
+    for (const g of dto.garments) {
+      if (!SUPPORTED.includes(g.category)) {
+        throw new BadRequestException(
+          `Categoría no soportada para try-on: ${g.category}. Soportadas: top, bottom, outerwear, dress.`,
+        );
+      }
+    }
+
+    const creditsNeeded = dto.garments.length;
+    const tryonStats = await this.subscriptionsService.getTryonStats(userId);
+    const remaining = tryonStats.tryonsLimitThisMonth !== null
+      ? tryonStats.tryonsLimitThisMonth - tryonStats.tryonsUsedThisMonth
+      : Infinity;
+
+    if (remaining < creditsNeeded) {
+      throw new HttpException(
+        {
+          error: 'INSUFFICIENT_CREDITS',
+          message: `Necesitás ${creditsNeeded} créditos pero solo tenés ${remaining}`,
+          creditsNeeded,
+          creditsAvailable: remaining === Infinity ? null : remaining,
+        },
+        HttpStatus.PAYMENT_REQUIRED,
+      );
+    }
+
+    const ORDER = ['bottom', 'dress', 'top', 'outerwear'];
+    const sorted = [...dto.garments].sort(
+      (a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category),
+    );
+
+    let currentImageUrl = dto.userPhotoUrl;
+    let creditsUsed = 0;
+
+    for (const g of sorted) {
+      const garment = await this.wardrobeModel.findOne({
+        _id: new Types.ObjectId(g.garmentId),
+        userId: new Types.ObjectId(userId),
+      }).lean();
+
+      if (!garment) throw new NotFoundException(`Garment ${g.garmentId} not found`);
+
+      const vtonCategory = mapCategoryToVton(garment.category || g.category);
+      const garmentDes = buildGarmentDes(garment);
+      const garmentUrl = garment.imageProcessedUrl ?? garment.imageUrl;
+
+      this.logger.log(`[tryon/outfit] Processing garment=${g.garmentId} category=${vtonCategory} des="${garmentDes}"`);
+
+      try {
+        const result = await this.aiService.tryon(currentImageUrl, [garmentUrl], garmentDes, vtonCategory);
+        currentImageUrl = result.resultUrl;
+        creditsUsed++;
+        await this.subscriptionsService.decrementTryonCredit(userId);
+        this.logger.log(`[tryon/outfit] Garment ${g.garmentId} done. creditsUsed=${creditsUsed}`);
+      } catch (err) {
+        this.logger.error(`[tryon/outfit] Garment ${g.garmentId} failed: ${(err as Error).message}`);
+        throw new InternalServerErrorException(`El try-on de la prenda ${g.garmentId} falló. Intentá de nuevo.`);
+      }
+    }
+
+    if (dto.outfitId) {
+      this.logger.log(`[tryon/outfit] Saving result to outfitId=${dto.outfitId}`);
+    }
+
+    this.logger.log(`[tryon/outfit] Done. creditsUsed=${creditsUsed} resultUrl=${currentImageUrl}`);
+    return { resultImageUrl: currentImageUrl, creditsUsed };
   }
 }

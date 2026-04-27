@@ -26,7 +26,7 @@ describe('TryonService', () => {
       findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
     };
     mockWardrobeModel = {
-      findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ imageUrl: 'https://r2.example.com/garment.jpg', name: 'Test garment', type: 'top', color: 'blue', category: 'shirt' }) }),
+      findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ imageUrl: 'https://r2.example.com/garment.jpg', imageProcessedUrl: 'https://r2.example.com/garment-bg.jpg', name: 'Test garment', type: 'top', color: 'blue', category: 'top' }) }),
     };
     mockAIService = { tryon: jest.fn().mockResolvedValue({ resultUrl: 'https://r2.example.com/result.jpg' }) };
     mockR2Service = {

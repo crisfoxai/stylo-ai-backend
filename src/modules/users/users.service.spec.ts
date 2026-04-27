@@ -5,11 +5,13 @@ import { Types } from 'mongoose';
 import { UsersService } from './users.service';
 import { User } from './schemas/user.schema';
 import { StyleProfileService } from '../style-profile/style-profile.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 describe('UsersService', () => {
   let service: UsersService;
   let mockUserModel: { findById: jest.Mock; findByIdAndUpdate: jest.Mock };
   let mockStyleProfileService: { findByUser: jest.Mock };
+  let mockSubscriptionsService: { getTryonStats: jest.Mock };
 
   const userId = new Types.ObjectId().toString();
 
@@ -21,12 +23,16 @@ describe('UsersService', () => {
     mockStyleProfileService = {
       findByUser: jest.fn(),
     };
+    mockSubscriptionsService = {
+      getTryonStats: jest.fn().mockResolvedValue({ tryonsUsedThisMonth: 0, tryonsLimitThisMonth: 5, tryonsResetAt: null }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: getModelToken(User.name), useValue: mockUserModel },
         { provide: StyleProfileService, useValue: mockStyleProfileService },
+        { provide: SubscriptionsService, useValue: mockSubscriptionsService },
       ],
     }).compile();
 

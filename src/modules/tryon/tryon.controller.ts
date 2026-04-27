@@ -15,7 +15,7 @@ import { TryonService } from './tryon.service';
 import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserDocument } from '../users/schemas/user.schema';
-import { TryonDto } from './dto/tryon.dto';
+import { TryonDto, TryonOutfitDto } from './dto/tryon.dto';
 
 @ApiTags('tryon')
 @Controller('tryon')
@@ -41,11 +41,12 @@ export class TryonController {
     file: Express.Multer.File,
     @Body() dto: TryonDto,
   ) {
-    return this.tryonService.tryon(
-      String(user._id),
-      file,
-      dto.garmentId,
-      dto.outfitId,
-    );
+    return this.tryonService.tryon(String(user._id), file, dto.garmentId, dto.outfitId);
+  }
+
+  @Post('outfit')
+  @ApiOperation({ summary: 'Try-on full outfit sequentially (lower_body → upper_body → outerwear)' })
+  async tryonOutfit(@CurrentUser() user: UserDocument, @Body() dto: TryonOutfitDto) {
+    return this.tryonService.tryonOutfit(String(user._id), dto);
   }
 }

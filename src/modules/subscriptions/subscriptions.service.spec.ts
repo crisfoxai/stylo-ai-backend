@@ -3,6 +3,8 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { SubscriptionsService } from './subscriptions.service';
 import { Subscription } from './schemas/subscription.schema';
+import { User } from '../users/schemas/user.schema';
+import { ReferralsService } from '../referrals/referrals.service';
 
 jest.mock('axios');
 import axios from 'axios';
@@ -17,6 +19,8 @@ describe('SubscriptionsService', () => {
     updateOne: jest.Mock;
     updateMany: jest.Mock;
   };
+  let mockUserModel: { findById: jest.Mock; findByIdAndUpdate: jest.Mock };
+  let mockReferralsService: { grantBonusDays: jest.Mock; onPurchaseValidated: jest.Mock };
 
   const userId = new Types.ObjectId().toString();
 
@@ -28,11 +32,21 @@ describe('SubscriptionsService', () => {
       updateOne: jest.fn().mockResolvedValue({}),
       updateMany: jest.fn().mockResolvedValue({}),
     };
+    mockUserModel = {
+      findById: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: userId, tryonsUsedThisMonth: 0 }) }),
+      findByIdAndUpdate: jest.fn().mockResolvedValue({}),
+    };
+    mockReferralsService = {
+      grantBonusDays: jest.fn().mockResolvedValue(undefined),
+      onPurchaseValidated: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SubscriptionsService,
         { provide: getModelToken(Subscription.name), useValue: mockSubscriptionModel },
+        { provide: getModelToken(User.name), useValue: mockUserModel },
+        { provide: ReferralsService, useValue: mockReferralsService },
       ],
     }).compile();
 

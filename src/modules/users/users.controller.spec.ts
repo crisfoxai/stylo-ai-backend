@@ -10,6 +10,7 @@ describe('UsersController', () => {
     findById: jest.Mock;
     update: jest.Mock;
     getStyleProfile: jest.Mock;
+    getTryonStats: jest.Mock;
     softDelete: jest.Mock;
   };
 
@@ -20,6 +21,7 @@ describe('UsersController', () => {
       findById: jest.fn(),
       update: jest.fn(),
       getStyleProfile: jest.fn().mockResolvedValue(null),
+      getTryonStats: jest.fn().mockResolvedValue({ tryonsUsedThisMonth: 0, tryonsLimitThisMonth: 20, tryonsResetAt: null }),
       softDelete: jest.fn(),
     };
 

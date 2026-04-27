@@ -4,12 +4,14 @@ import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { StyleProfileService } from '../style-profile/style-profile.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly styleProfileService: StyleProfileService,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   async findById(userId: string): Promise<UserDocument> {
@@ -32,6 +34,10 @@ export class UsersService {
     } catch {
       return null;
     }
+  }
+
+  async getTryonStats(userId: string) {
+    return this.subscriptionsService.getTryonStats(userId);
   }
 
   async softDelete(userId: string): Promise<void> {
