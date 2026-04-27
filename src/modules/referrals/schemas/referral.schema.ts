@@ -17,16 +17,16 @@ export class Referral {
   @Prop({ enum: ['pending', 'validated', 'rejected', 'credited'], default: 'pending', index: true })
   status!: string;
 
-  @Prop({ default: null })
+  @Prop({ type: Date, default: null })
   purchaseValidatedAt?: Date | null;
 
-  @Prop({ default: null })
+  @Prop({ type: Date, default: null })
   creditedAt?: Date | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   rejectedReason?: string | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   deviceFingerprint?: string | null;
 
   createdAt!: Date;
