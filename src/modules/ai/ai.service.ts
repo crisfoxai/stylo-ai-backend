@@ -98,7 +98,7 @@ export class AIService {
     if (this.replicateClient) {
       try {
         const output = await this.replicateClient.run(
-          'cuuupid/idm-vton',
+          'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
           {
             input: {
               human_img: userPhotoUrl,
