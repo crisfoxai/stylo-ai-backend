@@ -13,4 +13,5 @@ export class ReferralStatsResponseDto {
   @ApiProperty() bonusDaysActive!: boolean;
   @ApiPropertyOptional() premiumAccessUntil?: string | null;
   @ApiProperty() referralLink!: string;
+  @ApiProperty() alreadyReferred!: boolean;
 }

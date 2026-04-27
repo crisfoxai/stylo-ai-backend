@@ -98,6 +98,7 @@ export class ReferralsService {
       bonusDaysActive,
       premiumAccessUntil: user.premiumAccessUntil?.toISOString() ?? null,
       referralLink: `https://stylo.ai/join/${referralCode}`,
+      alreadyReferred: !!user.referredBy,
     };
   }
 
