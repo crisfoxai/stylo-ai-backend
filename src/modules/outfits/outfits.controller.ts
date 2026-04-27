@@ -36,6 +36,18 @@ export class OutfitsController {
     return this.outfitsService.listByUser(String(user._id), page, limit);
   }
 
+  @Get('history')
+  @ApiOperation({ summary: 'Get wear history (optionally filtered by month YYYY-MM)' })
+  async getHistory(@CurrentUser() user: UserDocument, @Query() dto: OutfitHistoryDto) {
+    return this.outfitsService.getHistory(String(user._id), dto);
+  }
+
+  @Get('favorites')
+  @ApiOperation({ summary: 'List favorite outfits' })
+  async getFavorites(@CurrentUser() user: UserDocument) {
+    return this.outfitsService.getFavorites(String(user._id));
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get single outfit by id' })
   async findOne(@CurrentUser() user: UserDocument, @Param('id') id: string) {
@@ -67,17 +79,5 @@ export class OutfitsController {
   @ApiOperation({ summary: 'Mark outfit as worn today' })
   async markWorn(@CurrentUser() user: UserDocument, @Param('id') id: string) {
     return this.outfitsService.markWorn(String(user._id), id);
-  }
-
-  @Get('history')
-  @ApiOperation({ summary: 'Get wear history (optionally filtered by month YYYY-MM)' })
-  async getHistory(@CurrentUser() user: UserDocument, @Query() dto: OutfitHistoryDto) {
-    return this.outfitsService.getHistory(String(user._id), dto);
-  }
-
-  @Get('favorites')
-  @ApiOperation({ summary: 'List favorite outfits' })
-  async getFavorites(@CurrentUser() user: UserDocument) {
-    return this.outfitsService.getFavorites(String(user._id));
   }
 }
