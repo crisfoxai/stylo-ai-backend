@@ -106,8 +106,9 @@ export class AIService {
               garment_des: garmentDescription,
             },
           },
-        ) as unknown as string;
-        return { resultUrl: output };
+        );
+        // Replicate returns a FileOutput object — convert to URL string
+        return { resultUrl: String(output) };
       } catch (err) {
         this.logger.error(`Replicate tryon failed: ${(err as Error).message}`);
         return { resultUrl: userPhotoUrl };
