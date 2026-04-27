@@ -20,6 +20,8 @@ import { StyleProfileModule } from './modules/style-profile/style-profile.module
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { ShareModule } from './modules/share/share.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
 
 @Module({
   imports: [
@@ -82,6 +84,8 @@ import { ChatModule } from './modules/chat/chat.module';
     FavoritesModule,
     FeedbackModule,
     ChatModule,
+    ShareModule,
+    ReferralsModule,
   ],
 })
 export class AppModule implements NestModule {

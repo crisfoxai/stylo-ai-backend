@@ -22,8 +22,21 @@ export class User {
 
   @Prop()
   deletedAt?: Date;
+
+  @Prop({ default: () => Math.random().toString(36).slice(2, 8).toUpperCase(), unique: true, sparse: true })
+  referralCode!: string;
+
+  @Prop({ default: null })
+  referredBy?: string | null;
+
+  @Prop({ default: null })
+  referredByCode?: string | null;
+
+  @Prop({ default: null })
+  premiumAccessUntil?: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ firebaseUid: 1 }, { unique: true });
 UserSchema.index({ email: 1 }, { unique: true, sparse: true });
+UserSchema.index({ referralCode: 1 }, { unique: true, sparse: true });

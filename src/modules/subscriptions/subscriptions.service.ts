@@ -1,10 +1,12 @@
-import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import axios from 'axios';
 import { Subscription, SubscriptionDocument } from './schemas/subscription.schema';
 import { VerifyReceiptDto, DevUpgradeDto } from './dto/subscription.dto';
 import { PLAN_LIMITS, PRODUCT_TIER_MAP, PlanTier } from './subscription.limits';
+import { ReferralsService } from '../referrals/referrals.service';
+import { User, UserDocument } from '../users/schemas/user.schema';
 
 function startOfMonth(date = new Date()): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -16,6 +18,8 @@ export class SubscriptionsService {
 
   constructor(
     @InjectModel(Subscription.name) private readonly subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(forwardRef(() => ReferralsService)) private readonly referralsService: ReferralsService,
   ) {}
 
   async getByUserId(userId: string): Promise<SubscriptionDocument> {
@@ -56,8 +60,10 @@ export class SubscriptionsService {
       sub.chatMessagesUsedThisMonth = 0;
     }
 
-    const plan = sub.plan in PLAN_LIMITS ? (sub.plan as PlanTier) : 'free';
-    const limits = PLAN_LIMITS[plan];
+    const userDoc = await this.userModel.findById(userId).lean();
+    const hasPremiumBonus = !!(userDoc?.premiumAccessUntil && userDoc.premiumAccessUntil > now);
+    const effectivePlan = hasPremiumBonus ? 'pro' : (sub.plan in PLAN_LIMITS ? (sub.plan as PlanTier) : 'free');
+    const limits = PLAN_LIMITS[effectivePlan];
     const field = type === 'tryon' ? 'tryonUsedThisMonth' : 'chatMessagesUsedThisMonth';
     const limit = type === 'tryon' ? limits.tryon : limits.chatMessages;
     const used = sub[field] ?? 0;
@@ -180,6 +186,13 @@ export class SubscriptionsService {
       },
       { upsert: true, new: true },
     );
+
+    if (status === 'active') {
+      await this.referralsService.onPurchaseValidated(userId).catch((err: Error) =>
+        this.logger.warn(`Referral onPurchaseValidated failed: ${err.message}`),
+      );
+    }
+
     return sub as SubscriptionDocument;
   }
 

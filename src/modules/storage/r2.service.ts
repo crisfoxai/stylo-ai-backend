@@ -47,6 +47,7 @@ export class R2Service {
     key: string,
     stream: Readable | Buffer,
     contentType: string,
+    metadata?: Record<string, string>,
   ): Promise<string> {
     if (this.mockMode) {
       return `https://mock-storage/${bucket}/${key}`;
@@ -62,10 +63,18 @@ export class R2Service {
         Body: body,
         ContentType: contentType,
         ...(contentLength !== undefined ? { ContentLength: contentLength } : {}),
+        ...(metadata ? { Metadata: metadata } : {}),
       }),
     );
 
     // Use public CDN URL if configured (R2 public bucket), otherwise use S3 endpoint URL
+    return this.publicBaseUrl
+      ? `${this.publicBaseUrl}/${key}`
+      : `${this.endpoint}/${bucket}/${key}`;
+  }
+
+  getPublicUrl(bucket: string, key: string): string {
+    if (this.mockMode) return `https://mock-storage/${bucket}/${key}`;
     return this.publicBaseUrl
       ? `${this.publicBaseUrl}/${key}`
       : `${this.endpoint}/${bucket}/${key}`;

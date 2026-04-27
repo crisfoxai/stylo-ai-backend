@@ -41,15 +41,18 @@ export class OutfitsService {
       weather,
       styleProfile,
       dto.excludeIds,
+      dto,
     );
 
     const outfitDoc = await this.outfitModel.create({
       userId: new Types.ObjectId(userId),
       occasion: dto.occasion,
       mood: dto.mood,
-      weatherContext: weather,
+      weatherContext: dto.weatherContext ?? weather,
       items: composition.items,
       aiModel: composition.aiModel,
+      justification: composition.justification,
+      contextFactors: composition.contextFactors,
     });
 
     const base = typeof (outfitDoc as unknown as { toJSON?: () => object }).toJSON === 'function'

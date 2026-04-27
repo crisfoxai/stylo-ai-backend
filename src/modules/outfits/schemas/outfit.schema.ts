@@ -34,6 +34,12 @@ export class Outfit {
 
   @Prop({ default: '' })
   aiModel!: string;
+
+  @Prop({ default: '' })
+  justification!: string;
+
+  @Prop({ type: [String], default: [] })
+  contextFactors!: string[];
 }
 
 export const OutfitSchema = SchemaFactory.createForClass(Outfit);
