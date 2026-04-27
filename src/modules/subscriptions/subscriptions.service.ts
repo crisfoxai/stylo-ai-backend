@@ -193,7 +193,7 @@ export class SubscriptionsService {
           expiresAt: new Date('2027-12-31'),
           tryonUsedThisMonth: 0,
           chatMessagesUsedThisMonth: 0,
-          platform: 'dev',
+          platform: 'none',
           periodStart: startOfMonth(),
         },
       },
