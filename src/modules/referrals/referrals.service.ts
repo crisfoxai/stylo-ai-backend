@@ -73,15 +73,16 @@ export class ReferralsService {
   }
 
   async getStats(userId: string): Promise<ReferralStatsResponseDto> {
-    let user = await this.userModel.findById(userId);
+    // Atomic: only set referralCode if missing or null — avoids race condition with unique sparse index
+    const user = await this.userModel.findOneAndUpdate(
+      { _id: userId, $or: [{ referralCode: { $exists: false } }, { referralCode: null }] },
+      { $set: { referralCode: Math.random().toString(36).slice(2, 8).toUpperCase() } },
+      { new: true },
+    ) ?? await this.userModel.findById(userId).lean();
+
     if (!user) throw new BadRequestException({ error: 'NOT_FOUND' });
 
-    if (!user.referralCode) {
-      user.referralCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-      await user.save();
-    }
-
-    const referralCode = user.referralCode;
+    const referralCode = user.referralCode!;
 
     const [totalReferred, validated] = await Promise.all([
       this.referralModel.countDocuments({ referrerId: userId }),
