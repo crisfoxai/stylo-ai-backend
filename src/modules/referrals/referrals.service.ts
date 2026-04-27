@@ -73,8 +73,15 @@ export class ReferralsService {
   }
 
   async getStats(userId: string): Promise<ReferralStatsResponseDto> {
-    const user = await this.userModel.findById(userId).lean();
+    let user = await this.userModel.findById(userId);
     if (!user) throw new BadRequestException({ error: 'NOT_FOUND' });
+
+    if (!user.referralCode) {
+      user.referralCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+      await user.save();
+    }
+
+    const referralCode = user.referralCode;
 
     const [totalReferred, validated] = await Promise.all([
       this.referralModel.countDocuments({ referrerId: userId }),
@@ -85,12 +92,12 @@ export class ReferralsService {
     const bonusDaysActive = !!(user.premiumAccessUntil && user.premiumAccessUntil > now);
 
     return {
-      referralCode: user.referralCode,
+      referralCode,
       totalReferred,
       validated,
       bonusDaysActive,
       premiumAccessUntil: user.premiumAccessUntil?.toISOString() ?? null,
-      referralLink: `https://stylo.ai/join/${user.referralCode}`,
+      referralLink: `https://stylo.ai/join/${referralCode}`,
     };
   }
 
