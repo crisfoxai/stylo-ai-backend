@@ -45,6 +45,33 @@ export class WardrobeItem {
 
   @Prop({ default: false })
   archived!: boolean;
+
+  @Prop({ type: String, default: null })
+  colorSecondary!: string | null;
+
+  @Prop({ type: [String], default: [] })
+  materials!: string[];
+
+  @Prop({ type: String, default: null })
+  fit!: string | null;
+
+  @Prop({ type: [String], default: [] })
+  seasons!: string[];
+
+  @Prop({ type: [String], default: [] })
+  occasions!: string[];
+
+  @Prop({ type: String, default: null })
+  condition!: string | null;
+
+  @Prop({ type: Number, default: null })
+  purchasePrice!: number | null;
+
+  @Prop({ type: Date, default: null })
+  purchaseDate!: Date | null;
+
+  @Prop({ type: String, default: null })
+  notes!: string | null;
 }
 
 export const WardrobeItemSchema = SchemaFactory.createForClass(WardrobeItem);

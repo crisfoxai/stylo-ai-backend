@@ -10,6 +10,7 @@ import { WardrobeItem, WardrobeItemSchema } from '../wardrobe/schemas/wardrobe-i
 import { WeatherModule } from '../weather/weather.module';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AuthModule } from '../auth/auth.module';
     WeatherModule,
     UsersModule,
     AuthModule,
+    StorageModule,
   ],
   controllers: [OutfitsController],
   providers: [OutfitsService, OutfitsGenerator],

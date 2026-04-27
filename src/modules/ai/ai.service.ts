@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
 import Replicate from 'replicate';
+import Anthropic from '@anthropic-ai/sdk';
 
 export interface ClassifyResult {
   name: string;
@@ -21,6 +22,15 @@ export interface RemoveBgResult {
 
 export interface TryonResult {
   resultUrl: string;
+}
+
+export interface DetectedGarment {
+  tipo: string;
+  color: string;
+  descripcion: string;
+  categoria: string;
+  material: string | null;
+  fit: string | null;
 }
 
 // Fallback classification when AI fails — keeps the pipeline moving
@@ -53,6 +63,7 @@ export class AIService {
   private readonly provider: string;
   private geminiClient?: GoogleGenerativeAI;
   private replicateClient?: Replicate;
+  private anthropicClient?: Anthropic;
 
   // Legacy HTTP proxy fields (used when AI_PROVIDER=custom)
   private readonly baseUrl: string;
@@ -78,6 +89,12 @@ export class AIService {
     if (replicateToken) {
       this.replicateClient = new Replicate({ auth: replicateToken });
       this.logger.log('AIService: Replicate client initialized');
+    }
+
+    const anthropicKey = configService.get<string>('ANTHROPIC_API_KEY');
+    if (anthropicKey) {
+      this.anthropicClient = new Anthropic({ apiKey: anthropicKey });
+      this.logger.log('AIService: Anthropic client initialized');
     }
   }
 
@@ -196,5 +213,47 @@ export class AIService {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private readonly DETECT_PROMPT = `Analizá esta imagen. Detectá todas las prendas de ropa y accesorios visibles sobre la persona. Para cada prenda indicá:
+- tipo (remera, pantalón, vestido, calzado, accesorio, etc.)
+- color (color principal en español)
+- descripcion (descripción breve, máx 10 palabras)
+- categoria (top | bottom | outerwear | footwear | accessory)
+- material (estimado si es visible: algodón, denim, cuero, lana, sintético, lino, seda, poliéster, mezcla — null si no se puede determinar)
+- fit (slim | regular | oversize | relaxed | cropped — null si no aplica o no se puede determinar)
+
+Devolvé SOLO un JSON array válido sin texto adicional. Máximo 8 items. Si no hay persona o no hay prendas visibles, devolvé [].`;
+
+  async detectGarments(imageBuffer: Buffer, mimeType: string): Promise<DetectedGarment[]> {
+    if (!this.anthropicClient) {
+      this.logger.warn('detectGarments: Anthropic client not available, returning empty');
+      return [];
+    }
+
+    const mediaType = (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mimeType)
+      ? mimeType
+      : 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+    const base64 = imageBuffer.toString('base64');
+    const response = await this.anthropicClient.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: this.DETECT_PROMPT },
+        ],
+      }],
+    });
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : '[]';
+    try {
+      const raw = JSON.parse(text.trim());
+      return Array.isArray(raw) ? (raw as DetectedGarment[]).slice(0, 8) : [];
+    } catch {
+      return [];
+    }
   }
 }

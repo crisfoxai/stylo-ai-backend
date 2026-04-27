@@ -3,7 +3,9 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import sharp from 'sharp';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
 
@@ -15,8 +17,8 @@ function assertObjectId(value: string, field = 'id'): void {
 import { v4 as uuidv4 } from 'uuid';
 import { WardrobeItem, WardrobeItemDocument } from './schemas/wardrobe-item.schema';
 import { WardrobeJob, WardrobeJobDocument } from './schemas/wardrobe-job.schema';
-import { ListWardrobeDto, UpdateWardrobeItemDto } from './dto/wardrobe.dto';
-import { AIService } from '../ai/ai.service';
+import { ListWardrobeDto, UpdateWardrobeItemDto, ConfirmDetectionDto } from './dto/wardrobe.dto';
+import { AIService, DetectedGarment } from '../ai/ai.service';
 import { R2Service } from '../storage/r2.service';
 
 @Injectable()
@@ -114,6 +116,14 @@ export class WardrobeService {
     return { id: String(_id), ...rest };
   }
 
+  async countForUser(userId: string): Promise<number> {
+    assertObjectId(userId, 'userId');
+    return this.itemModel.countDocuments({
+      userId: new Types.ObjectId(userId),
+      archived: false,
+    });
+  }
+
   async list(userId: string, dto: ListWardrobeDto): Promise<{ items: (Record<string, unknown> & { id: string })[]; total: number; page: number }> {
     assertObjectId(userId, 'userId');
     const filter: FilterQuery<WardrobeItem> = {
@@ -183,5 +193,107 @@ export class WardrobeService {
     if (String(item.userId) !== userId) throw new ForbiddenException({ error: 'FORBIDDEN' });
 
     await this.itemModel.findByIdAndUpdate(itemId, { $set: { archived: true } });
+  }
+
+  async detectFromPhoto(
+    file: Express.Multer.File,
+  ): Promise<{ detected: DetectedGarment[]; photoKey: string }> {
+    const bucket = this.r2Service.bucketWardrobe();
+    const photoKey = `wardrobe/detections/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+
+    await this.r2Service.uploadStream(bucket, photoKey, file.buffer, file.mimetype, {
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    const detected = await this.aiService.detectGarments(file.buffer, file.mimetype);
+
+    if (detected.length === 0) {
+      throw new UnprocessableEntityException({ error: 'NO_GARMENTS_DETECTED' });
+    }
+
+    return { detected, photoKey };
+  }
+
+  async confirmDetection(
+    userId: string,
+    dto: ConfirmDetectionDto,
+  ): Promise<{ created: number; garmentIds: string[] }> {
+    assertObjectId(userId, 'userId');
+
+    const bucket = this.r2Service.bucketWardrobe();
+    // Download original photo from R2 via signed URL then fetch
+    const signedUrl = await this.r2Service.getSignedReadUrl(bucket, dto.photoKey, 300);
+    let originalBuffer: Buffer;
+    try {
+      const res = await fetch(signedUrl);
+      originalBuffer = Buffer.from(await res.arrayBuffer());
+    } catch {
+      throw new BadRequestException({ error: 'PHOTO_NOT_FOUND' });
+    }
+
+    const meta = await sharp(originalBuffer).metadata();
+    const imgH = meta.height ?? 800;
+    const imgW = meta.width ?? 600;
+
+    const garmentIds: string[] = [];
+
+    for (const g of dto.garments) {
+      // Crop by category
+      const cropRegion = this.getCropRegion(g.categoria, imgW, imgH);
+      let croppedBuffer = await sharp(originalBuffer)
+        .extract(cropRegion)
+        .jpeg({ quality: 90 })
+        .toBuffer();
+
+      // Remove background via Replicate (reuse existing pipeline)
+      let processedUrl: string | undefined;
+      try {
+        const tempKey = `wardrobe/${userId}/detection-temp-${Date.now()}.jpg`;
+        const tempUrl = await this.r2Service.uploadStream(bucket, tempKey, croppedBuffer, 'image/jpeg');
+        const removeBgResult = await this.aiService.removeBg(tempUrl);
+        processedUrl = removeBgResult.processedUrl;
+        await this.r2Service.deleteObject(bucket, tempKey).catch(() => {});
+      } catch {
+        // proceed without bg removal
+      }
+
+      const item = await this.itemModel.create({
+        userId: new Types.ObjectId(userId),
+        imageUrl: processedUrl ?? '',
+        imageProcessedUrl: processedUrl,
+        name: g.descripcion,
+        type: g.tipo,
+        category: g.categoria,
+        color: g.color,
+        ...(g.material && { material: g.material }),
+        ...(g.fit && { fit: g.fit }),
+        ...(g.seasons && { seasons: g.seasons }),
+        ...(g.occasions && { occasions: g.occasions }),
+        aiConfidence: 0.9,
+        status: processedUrl ? 'ready' : 'processing',
+        tags: [],
+      });
+
+      garmentIds.push(String(item._id));
+    }
+
+    return { created: garmentIds.length, garmentIds };
+  }
+
+  private getCropRegion(
+    categoria: string,
+    w: number,
+    h: number,
+  ): { left: number; top: number; width: number; height: number } {
+    switch (categoria) {
+      case 'top':
+        return { left: 0, top: 0, width: w, height: Math.floor(h * 0.5) };
+      case 'bottom':
+        return { left: 0, top: Math.floor(h * 0.4), width: w, height: Math.floor(h * 0.6) };
+      case 'footwear':
+        return { left: 0, top: Math.floor(h * 0.65), width: w, height: Math.floor(h * 0.35) };
+      default:
+        return { left: 0, top: 0, width: w, height: h };
+    }
   }
 }

@@ -3,21 +3,23 @@ import {
   Post,
   Delete,
   Get,
+  Patch,
   Param,
   Body,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   HttpCode,
   HttpStatus,
-  ParseIntPipe,
-  DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { OutfitsService } from './outfits.service';
 import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserDocument } from '../users/schemas/user.schema';
-import { GenerateOutfitDto, OutfitHistoryDto } from './dto/outfit.dto';
+import { GenerateOutfitDto, OutfitHistoryDto, ListOutfitsDto } from './dto/outfit.dto';
 
 @ApiTags('outfits')
 @Controller('outfits')
@@ -27,13 +29,9 @@ export class OutfitsController {
   constructor(private readonly outfitsService: OutfitsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List outfits for current user (paginated)' })
-  async list(
-    @CurrentUser() user: UserDocument,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-  ) {
-    return this.outfitsService.listByUser(String(user._id), page, limit);
+  @ApiOperation({ summary: 'List outfits for current user (paginated + filtered)' })
+  async list(@CurrentUser() user: UserDocument, @Query() dto: ListOutfitsDto) {
+    return this.outfitsService.listByUser(String(user._id), dto);
   }
 
   @Get('history')
@@ -79,5 +77,23 @@ export class OutfitsController {
   @ApiOperation({ summary: 'Mark outfit as worn today' })
   async markWorn(@CurrentUser() user: UserDocument, @Param('id') id: string) {
     return this.outfitsService.markWorn(String(user._id), id);
+  }
+
+  @Post(':outfitId/look-photo')
+  @UseInterceptors(FileInterceptor('photo'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload look photo for outfit' })
+  async uploadLookPhoto(
+    @CurrentUser() user: UserDocument,
+    @Param('outfitId') outfitId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.outfitsService.uploadLookPhoto(String(user._id), outfitId, file);
+  }
+
+  @Delete(':outfitId/look-photo')
+  @ApiOperation({ summary: 'Remove look photo from outfit' })
+  async deleteLookPhoto(@CurrentUser() user: UserDocument, @Param('outfitId') outfitId: string) {
+    return this.outfitsService.deleteLookPhoto(String(user._id), outfitId);
   }
 }

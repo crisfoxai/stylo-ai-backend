@@ -39,7 +39,7 @@ export class OutfitsGenerator {
     context?: GenerateOutfitDto,
   ): Promise<OutfitComposition> {
     const items = await this.itemModel
-      .find({ userId: new Types.ObjectId(userId), status: 'ready', archived: false })
+      .find({ userId: new Types.ObjectId(userId), status: 'ready', archived: false, condition: { $ne: 'para_donar' } })
       .lean();
 
     const composition: { wardrobeItemId: Types.ObjectId; slot: string }[] = [];
@@ -62,7 +62,7 @@ export class OutfitsGenerator {
   }
 
   buildOutfitPrompt(
-    wardrobe: { name?: string; type?: string; color?: string; category?: string }[],
+    wardrobe: { name?: string; type?: string; color?: string; category?: string; materials?: string[]; fit?: string | null; seasons?: string[]; occasions?: string[]; condition?: string | null }[],
     styleProfile: StyleProfileDocument | null,
     recentOutfitIds: string[][],
     context: GenerateOutfitDto,
@@ -77,7 +77,15 @@ export class OutfitsGenerator {
     sections.push(`Sos un estilista personal AI para Stylo AI.
 
 GUARDARROPA (${wardrobe.length} prendas):
-${JSON.stringify(wardrobe.map((i) => ({ name: i.name, type: i.type, color: i.color, category: i.category })))}
+${JSON.stringify(wardrobe
+  .filter((i) => i.condition !== 'para_donar')
+  .map((i) => ({
+    name: i.name, type: i.type, color: i.color, category: i.category,
+    ...(i.materials?.length && { materials: i.materials }),
+    ...(i.fit && { fit: i.fit }),
+    ...(i.seasons?.length && { seasons: i.seasons }),
+    ...(i.occasions?.length && { occasions: i.occasions }),
+  })))}
 
 PERFIL DE ESTILO:
 ${styleProfile ? JSON.stringify(styleProfile) : 'Sin configurar'}

@@ -40,6 +40,20 @@ export class Outfit {
 
   @Prop({ type: [String], default: [] })
   contextFactors!: string[];
+
+  @Prop({ type: String, enum: ['tryon', 'user_look', 'collage', 'placeholder'], default: 'placeholder' })
+  coverImageSource!: string;
+
+  @Prop({ type: String, default: null })
+  tryonImageUrl!: string | null;
+
+  @Prop({ type: String, default: null })
+  lookPhotoUrl!: string | null;
+
+  @Prop({ type: String, default: null })
+  collageImageUrl!: string | null;
+
+  createdAt!: Date;
 }
 
 export const OutfitSchema = SchemaFactory.createForClass(Outfit);
