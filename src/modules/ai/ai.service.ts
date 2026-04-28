@@ -276,15 +276,15 @@ export class AIService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private readonly DETECT_PROMPT = `Analizá esta imagen. Detectá todas las prendas de ropa y accesorios visibles sobre la persona. Para cada prenda indicá:
-- tipo (remera, pantalón, vestido, calzado, accesorio, etc.)
-- color (color principal en español)
-- descripcion (descripción breve, máx 10 palabras)
+  private readonly DETECT_PROMPT = `Analyze this image. Detect all visible clothing items and accessories on the person. For each item indicate:
+- tipo (shirt, pants, dress, shoes, accessory, etc. — in English)
+- color (primary color in English: black, white, blue, red, green, yellow, brown, grey, beige, pink, purple, orange, navy, etc.)
+- descripcion (brief description, max 10 words, in English)
 - categoria (top | bottom | outerwear | footwear | accessory)
-- material (estimado si es visible: algodón, denim, cuero, lana, sintético, lino, seda, poliéster, mezcla — null si no se puede determinar)
-- fit (slim | regular | oversize | relaxed | cropped — null si no aplica o no se puede determinar)
+- material (estimated if visible: cotton, denim, leather, wool, synthetic, linen, silk, polyester, blend — null if not determinable)
+- fit (slim | regular | oversize | relaxed | cropped — null if not applicable or not determinable)
 
-Devolvé SOLO un JSON array válido sin texto adicional. Máximo 8 items. Si no hay persona o no hay prendas visibles, devolvé [].`;
+Return ONLY a valid JSON array with no additional text. Maximum 8 items. If there is no person or no visible clothing, return [].`;
 
   async detectGarments(imageBuffer: Buffer, mimeType: string): Promise<DetectedGarment[]> {
     if (!this.anthropicClient) {

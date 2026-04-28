@@ -53,7 +53,7 @@ export class UpdateWardrobeItemDto {
   @ApiPropertyOptional({ enum: ['top', 'bottom', 'shoes', 'accessory', 'outerwear', 'dress', 'other'] })
   @IsOptional() @IsString() @IsIn(['top', 'bottom', 'shoes', 'accessory', 'outerwear', 'dress', 'other'])
   category?: string;
-  @ApiPropertyOptional({ enum: ['nuevo', 'buen_estado', 'usado', 'para_donar'] })
+  @ApiPropertyOptional({ enum: ['new', 'good', 'used', 'donate'] })
   @IsOptional() @IsString() condition?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() purchasePrice?: number;
   @ApiPropertyOptional() @IsOptional() @IsDateString() purchaseDate?: string;

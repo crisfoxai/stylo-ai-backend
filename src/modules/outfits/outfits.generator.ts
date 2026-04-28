@@ -39,7 +39,7 @@ export class OutfitsGenerator {
     context?: GenerateOutfitDto,
   ): Promise<OutfitComposition> {
     const items = await this.itemModel
-      .find({ userId: new Types.ObjectId(userId), status: 'ready', archived: false, condition: { $ne: 'para_donar' } })
+      .find({ userId: new Types.ObjectId(userId), status: 'ready', archived: false, condition: { $nin: ['para_donar', 'donate'] } })
       .lean();
 
     const composition: { wardrobeItemId: Types.ObjectId; slot: string }[] = [];
@@ -78,7 +78,7 @@ export class OutfitsGenerator {
 
 GUARDARROPA (${wardrobe.length} prendas):
 ${JSON.stringify(wardrobe
-  .filter((i) => i.condition !== 'para_donar')
+  .filter((i) => i.condition !== 'para_donar' && i.condition !== 'donate')
   .map((i) => ({
     name: i.name, type: i.type, color: i.color, category: i.category,
     ...(i.materials?.length && { materials: i.materials }),
