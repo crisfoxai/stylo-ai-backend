@@ -4,6 +4,8 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
@@ -92,6 +94,27 @@ export class R2Service {
   async deleteObject(bucket: string, key: string): Promise<void> {
     if (this.mockMode) return;
     await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  }
+
+  async deleteByPrefix(bucket: string, prefix: string): Promise<void> {
+    if (this.mockMode) return;
+    let continuationToken: string | undefined;
+    do {
+      const listRes = await this.client.send(
+        new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: continuationToken }),
+      );
+      const objects = listRes.Contents ?? [];
+      if (objects.length > 0) {
+        await this.client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: { Objects: objects.map((o) => ({ Key: o.Key! })), Quiet: true },
+          }),
+        );
+        this.logger.log(`R2 deleteByPrefix: deleted ${objects.length} objects from ${bucket}/${prefix}`);
+      }
+      continuationToken = listRes.IsTruncated ? listRes.NextContinuationToken : undefined;
+    } while (continuationToken);
   }
 
   bucketWardrobe(): string {

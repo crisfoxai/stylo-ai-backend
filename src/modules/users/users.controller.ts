@@ -59,9 +59,10 @@ export class UsersController {
   }
 
   @Delete('me')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'GDPR account deletion (soft delete)' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Permanent account deletion (Apple / GDPR compliance)' })
   async deleteMe(@CurrentUser() user: UserDocument) {
-    await this.usersService.softDelete(String(user._id));
+    await this.usersService.hardDelete(String(user._id), user.firebaseUid);
+    return { ok: true };
   }
 }
