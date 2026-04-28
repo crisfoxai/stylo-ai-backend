@@ -27,8 +27,11 @@ export class TryonOutfitGarmentDto {
 
 /** Swagger schema for the multipart/form-data outfit try-on endpoint */
 export class TryonOutfitFormDto {
-  @ApiProperty({ type: 'string', format: 'binary', description: 'User photo (JPEG/PNG, max 10 MB)' })
-  userPhoto!: Express.Multer.File;
+  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'New base photo (JPEG/PNG, max 10 MB). Provide this or basePhotoId, not both.' })
+  basePhotoFile?: Express.Multer.File;
+
+  @ApiPropertyOptional({ type: 'string', description: 'ID of existing base photo. Provide this or basePhotoFile, not both.' })
+  basePhotoId?: string;
 
   @ApiProperty({
     type: 'string',

@@ -175,10 +175,18 @@ export class TryonService {
 
   async tryonOutfit(
     userId: string,
-    userPhoto: Express.Multer.File,
+    userPhoto: Express.Multer.File | null,
     garments: TryonOutfitGarmentDto[],
     outfitId?: string,
+    basePhotoId?: string,
   ): Promise<{ resultImageUrl: string; creditsUsed: number }> {
+    // Exactly one of userPhoto or basePhotoId must be provided
+    if (!userPhoto && !basePhotoId) {
+      throw new BadRequestException({ error: 'MISSING_PHOTO', message: 'Provide either basePhotoFile or basePhotoId.' });
+    }
+    if (userPhoto && basePhotoId) {
+      throw new BadRequestException({ error: 'AMBIGUOUS_PHOTO', message: 'Provide only one of basePhotoFile or basePhotoId.' });
+    }
     this.logger.log(`[tryon/outfit] userId=${userId} garments=${JSON.stringify(garments)}`);
 
     if (!garments?.length) {
@@ -212,10 +220,29 @@ export class TryonService {
       );
     }
 
-    const photoKey = `tryon/${userId}/${uuidv4()}.jpg`;
     const bucket = this.r2Service.bucketAvatars();
-    const userPhotoUrl = await this.r2Service.uploadStream(bucket, photoKey, userPhoto.buffer, userPhoto.mimetype);
-    this.logger.log(`[tryon/outfit] Photo uploaded: ${userPhotoUrl}`);
+    let userPhotoUrl: string;
+
+    if (userPhoto) {
+      // New upload — persist as TryOnBasePhoto and use it
+      const saved = await this.uploadBasePhoto(userId, userPhoto);
+      const savedDoc = await this.basePhotoModel.findById(saved.id).lean();
+      userPhotoUrl = savedDoc
+        ? this.r2Service.getPublicUrl(bucket, savedDoc.r2Key)
+        : saved.url;
+    } else {
+      // Reuse existing base photo
+      if (!Types.ObjectId.isValid(basePhotoId!)) {
+        throw new BadRequestException({ error: 'INVALID_ID', field: 'basePhotoId' });
+      }
+      const baseDoc = await this.basePhotoModel.findOne({
+        _id: new Types.ObjectId(basePhotoId!),
+        userId: new Types.ObjectId(userId),
+      }).lean();
+      if (!baseDoc) throw new NotFoundException({ error: 'NOT_FOUND', message: 'Base photo not found.' });
+      userPhotoUrl = this.r2Service.getPublicUrl(bucket, baseDoc.r2Key);
+    }
+    this.logger.log(`[tryon/outfit] Photo resolved: ${userPhotoUrl}`);
 
     const ORDER = ['bottom', 'dress', 'top', 'outerwear'];
     const sorted = [...garments].sort(

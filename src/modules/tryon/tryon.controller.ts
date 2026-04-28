@@ -57,15 +57,16 @@ export class TryonController {
   }
 
   @Post('outfit')
-  @UseInterceptors(FileInterceptor('userPhoto'))
+  @UseInterceptors(FileInterceptor('basePhotoFile'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: TryonOutfitFormDto })
-  @ApiOperation({ summary: 'Try-on full outfit sequentially (lower_body → upper_body → outerwear)' })
+  @ApiOperation({ summary: 'Try-on full outfit (basePhotoFile xor basePhotoId required)' })
   async tryonOutfit(
     @CurrentUser() user: UserDocument,
-    @UploadedFile(FILE_PIPE) userPhoto: Express.Multer.File,
+    @UploadedFile() basePhotoFile: Express.Multer.File | undefined,
     @Body('garments') garmentsRaw: string,
     @Body('outfitId') outfitId?: string,
+    @Body('basePhotoId') basePhotoId?: string,
   ) {
     let garments: TryonOutfitGarmentDto[];
     try {
@@ -76,7 +77,13 @@ export class TryonController {
     if (!Array.isArray(garments) || garments.length === 0) {
       throw new BadRequestException('garments must be a non-empty array');
     }
-    return this.tryonService.tryonOutfit(String(user._id), userPhoto, garments, outfitId);
+    return this.tryonService.tryonOutfit(
+      String(user._id),
+      basePhotoFile ?? null,
+      garments,
+      outfitId,
+      basePhotoId,
+    );
   }
 
   // --- Base photos ---
