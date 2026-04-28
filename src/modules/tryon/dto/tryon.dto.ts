@@ -1,5 +1,4 @@
-import { IsOptional, IsString, IsNotEmpty, IsArray, ValidateNested, IsIn, ArrayMinSize, ArrayMaxSize } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsNotEmpty, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TryonDto {
@@ -20,28 +19,24 @@ export class TryonOutfitGarmentDto {
   @IsNotEmpty()
   garmentId!: string;
 
-  @ApiProperty({ enum: ['top', 'bottom', 'outerwear', 'dress'] })
+  @ApiProperty({ description: 'Garment category (top, bottom, outerwear, dress, or common aliases like pants, shirt, etc.)' })
   @IsString()
-  @IsIn(['top', 'bottom', 'outerwear', 'dress'])
+  @IsIn(['top', 'bottom', 'outerwear', 'dress', 'pants', 'jeans', 'trousers', 'shorts', 'skirt', 'shirt', 'tshirt', 'blouse', 'sweater', 'hoodie', 'jacket', 'coat'])
   category!: string;
 }
 
-export class TryonOutfitDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  userPhotoUrl!: string;
+/** Swagger schema for the multipart/form-data outfit try-on endpoint */
+export class TryonOutfitFormDto {
+  @ApiProperty({ type: 'string', format: 'binary', description: 'User photo (JPEG/PNG, max 10 MB)' })
+  userPhoto!: Express.Multer.File;
 
-  @ApiProperty({ type: [TryonOutfitGarmentDto] })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(3)
-  @ValidateNested({ each: true })
-  @Type(() => TryonOutfitGarmentDto)
-  garments!: TryonOutfitGarmentDto[];
+  @ApiProperty({
+    type: 'string',
+    description: 'JSON array of TryonOutfitGarmentDto objects',
+    example: '[{"garmentId":"abc123","category":"top"},{"garmentId":"def456","category":"pants"}]',
+  })
+  garments!: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
+  @ApiPropertyOptional({ type: 'string' })
   outfitId?: string;
 }

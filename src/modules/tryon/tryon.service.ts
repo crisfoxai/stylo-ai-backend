@@ -16,7 +16,7 @@ import { WardrobeItem, WardrobeItemDocument } from '../wardrobe/schemas/wardrobe
 import { AIService } from '../ai/ai.service';
 import { R2Service } from '../storage/r2.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
-import { TryonOutfitDto } from './dto/tryon.dto';
+import { TryonOutfitGarmentDto } from './dto/tryon.dto';
 
 const CATEGORY_MAP: Record<string, string> = {
   // Canonical
@@ -170,15 +170,17 @@ export class TryonService {
 
   async tryonOutfit(
     userId: string,
-    dto: TryonOutfitDto,
+    userPhoto: Express.Multer.File,
+    garments: TryonOutfitGarmentDto[],
+    outfitId?: string,
   ): Promise<{ resultImageUrl: string; creditsUsed: number }> {
-    this.logger.log(`[tryon/outfit] userId=${userId} garments=${JSON.stringify(dto.garments)}`);
+    this.logger.log(`[tryon/outfit] userId=${userId} garments=${JSON.stringify(garments)}`);
 
-    if (!dto.garments?.length) {
+    if (!garments?.length) {
       throw new BadRequestException('Debés seleccionar al menos una prenda.');
     }
 
-    for (const g of dto.garments) {
+    for (const g of garments) {
       const normalized = (g.category ?? '').toLowerCase().replace(/[-_\s]/g, '');
       if (!CATEGORY_MAP[normalized]) {
         throw new BadRequestException(
@@ -187,7 +189,7 @@ export class TryonService {
       }
     }
 
-    const creditsNeeded = dto.garments.length;
+    const creditsNeeded = garments.length;
     const tryonStats = await this.subscriptionsService.getTryonStats(userId);
     const remaining = tryonStats.tryonsLimitThisMonth !== null
       ? tryonStats.tryonsLimitThisMonth - tryonStats.tryonsUsedThisMonth
@@ -205,12 +207,17 @@ export class TryonService {
       );
     }
 
+    const photoKey = `tryon/${userId}/${uuidv4()}.jpg`;
+    const bucket = this.r2Service.bucketAvatars();
+    const userPhotoUrl = await this.r2Service.uploadStream(bucket, photoKey, userPhoto.buffer, userPhoto.mimetype);
+    this.logger.log(`[tryon/outfit] Photo uploaded: ${userPhotoUrl}`);
+
     const ORDER = ['bottom', 'dress', 'top', 'outerwear'];
-    const sorted = [...dto.garments].sort(
+    const sorted = [...garments].sort(
       (a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category),
     );
 
-    let currentImageUrl = dto.userPhotoUrl;
+    let currentImageUrl = userPhotoUrl;
     let creditsUsed = 0;
 
     for (const g of sorted) {
@@ -239,8 +246,8 @@ export class TryonService {
       }
     }
 
-    if (dto.outfitId) {
-      this.logger.log(`[tryon/outfit] Saving result to outfitId=${dto.outfitId}`);
+    if (outfitId) {
+      this.logger.log(`[tryon/outfit] Saving result to outfitId=${outfitId}`);
     }
 
     this.logger.log(`[tryon/outfit] Done. creditsUsed=${creditsUsed} resultUrl=${currentImageUrl}`);
