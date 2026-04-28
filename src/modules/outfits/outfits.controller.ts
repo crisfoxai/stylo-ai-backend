@@ -12,6 +12,7 @@ import {
   UploadedFile,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -20,6 +21,7 @@ import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserDocument } from '../users/schemas/user.schema';
 import { GenerateOutfitDto, OutfitHistoryDto, ListOutfitsDto } from './dto/outfit.dto';
+import { SwapGarmentDto } from './dto/swap-garment.dto';
 
 @ApiTags('outfits')
 @Controller('outfits')
@@ -46,6 +48,14 @@ export class OutfitsController {
     return this.outfitsService.getFavorites(String(user._id));
   }
 
+  @Get('preview')
+  @ApiOperation({ summary: 'Get active outfit preview from Redis (recovery)' })
+  async getPreview(@CurrentUser() user: UserDocument) {
+    const result = await this.outfitsService.getPreview(String(user._id));
+    if (!result) throw new NotFoundException({ error: 'NOT_FOUND', message: 'No active preview' });
+    return result;
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get single outfit by id' })
   async findOne(@CurrentUser() user: UserDocument, @Param('id') id: string) {
@@ -53,9 +63,16 @@ export class OutfitsController {
   }
 
   @Post('generate')
-  @ApiOperation({ summary: 'Generate an outfit suggestion' })
+  @ApiOperation({ summary: 'Generate outfit preview (stored in Redis, not persisted)' })
   async generate(@CurrentUser() user: UserDocument, @Body() dto: GenerateOutfitDto) {
     return this.outfitsService.generate(String(user._id), dto);
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Persist outfit from active Redis preview to MongoDB' })
+  async persist(@CurrentUser() user: UserDocument) {
+    return this.outfitsService.persistPreview(String(user._id));
   }
 
   @Post(':id/favorite')
@@ -95,5 +112,15 @@ export class OutfitsController {
   @ApiOperation({ summary: 'Remove look photo from outfit' })
   async deleteLookPhoto(@CurrentUser() user: UserDocument, @Param('outfitId') outfitId: string) {
     return this.outfitsService.deleteLookPhoto(String(user._id), outfitId);
+  }
+
+  @Post(':id/swap-garment')
+  @ApiOperation({ summary: 'Suggest alternative garment for a slot (no persistence)' })
+  async swapGarment(
+    @CurrentUser() user: UserDocument,
+    @Param('id') id: string,
+    @Body() dto: SwapGarmentDto,
+  ) {
+    return this.outfitsService.swapGarment(String(user._id), id, dto);
   }
 }

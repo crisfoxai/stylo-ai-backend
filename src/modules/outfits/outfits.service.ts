@@ -1,15 +1,19 @@
 import { Injectable, NotFoundException, BadRequestException, UnsupportedMediaTypeException, PayloadTooLargeException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
+import { RedisService } from '../redis/redis.service';
 import sharp from 'sharp';
 import { Outfit, OutfitDocument } from './schemas/outfit.schema';
 import { FavoriteOutfit, FavoriteOutfitDocument } from './schemas/favorite-outfit.schema';
 import { WornEntry, WornEntryDocument } from './schemas/worn-entry.schema';
 import { GenerateOutfitDto, OutfitHistoryDto, ListOutfitsDto } from './dto/outfit.dto';
-import { OutfitsGenerator } from './outfits.generator';
+import { SwapGarmentDto, GarmentSlot } from './dto/swap-garment.dto';
+import { OutfitsGenerator, OutfitGarment } from './outfits.generator';
 import { WeatherService } from '../weather/weather.service';
 import { UsersService } from '../users/users.service';
 import { R2Service } from '../storage/r2.service';
+import { WardrobeItem, WardrobeItemDocument } from '../wardrobe/schemas/wardrobe-item.schema';
 
 function assertObjectId(value: string, field = 'id'): void {
   if (!Types.ObjectId.isValid(value)) {
@@ -23,13 +27,18 @@ export class OutfitsService {
     @InjectModel(Outfit.name) private readonly outfitModel: Model<OutfitDocument>,
     @InjectModel(FavoriteOutfit.name) private readonly favoriteModel: Model<FavoriteOutfitDocument>,
     @InjectModel(WornEntry.name) private readonly wornModel: Model<WornEntryDocument>,
+    @InjectModel(WardrobeItem.name) private readonly wardrobeItemModel: Model<WardrobeItemDocument>,
     private readonly generator: OutfitsGenerator,
     private readonly weatherService: WeatherService,
     private readonly usersService: UsersService,
     private readonly r2Service: R2Service,
+    private readonly redisService: RedisService,
   ) {}
 
-  async generate(userId: string, dto: GenerateOutfitDto): Promise<OutfitDocument> {
+  // POST /outfits/generate — generates outfit preview and stores in Redis (no Mongo persistence)
+  async generate(userId: string, dto: GenerateOutfitDto): Promise<{
+    preview: { previewId: string; garments: OutfitGarment[]; justification: string; expiresAt: string };
+  }> {
     assertObjectId(userId, 'userId');
     const weather =
       dto.lat !== undefined && dto.lon !== undefined
@@ -47,27 +56,104 @@ export class OutfitsService {
       dto,
     );
 
-    const outfitDoc = await this.outfitModel.create({
-      userId: new Types.ObjectId(userId),
+    const previewId = uuidv4();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+    const previewData = {
+      previewId,
+      userId,
+      garments: composition.garments,
+      justification: composition.justification,
       occasion: dto.occasion,
       mood: dto.mood,
       weatherContext: dto.weatherContext ?? weather,
       items: composition.items,
       aiModel: composition.aiModel,
-      justification: composition.justification,
       contextFactors: composition.contextFactors,
-    });
+      expiresAt,
+    };
 
-    const base = typeof (outfitDoc as unknown as { toJSON?: () => object }).toJSON === 'function'
-      ? (outfitDoc as unknown as { toJSON: () => object }).toJSON()
-      : { ...outfitDoc };
+    await this.redisService.set(`outfit_preview:${userId}`, JSON.stringify(previewData), 1800);
 
     return {
-      ...base,
-      id: String(outfitDoc._id),
-      name: 'Outfit generado',
-      garments: composition.garments,
-    } as unknown as OutfitDocument;
+      preview: {
+        previewId,
+        garments: composition.garments,
+        justification: composition.justification,
+        expiresAt,
+      },
+    };
+  }
+
+  // GET /outfits/preview — recovery: get current preview from Redis
+  async getPreview(userId: string): Promise<{
+    preview: { previewId: string; garments: OutfitGarment[]; justification: string; expiresAt: string };
+  } | null> {
+    const raw = await this.redisService.get(`outfit_preview:${userId}`);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as {
+      previewId: string;
+      garments: OutfitGarment[];
+      justification: string;
+      expiresAt: string;
+    };
+    return {
+      preview: {
+        previewId: data.previewId,
+        garments: data.garments,
+        justification: data.justification,
+        expiresAt: data.expiresAt,
+      },
+    };
+  }
+
+  // POST /outfits — persist from preview stored in Redis
+  async persistPreview(userId: string): Promise<{ outfit: Record<string, unknown> }> {
+    assertObjectId(userId, 'userId');
+    const raw = await this.redisService.get(`outfit_preview:${userId}`);
+    if (!raw) {
+      throw new BadRequestException({ error: 'preview_expired', message: 'El preview expiró. Generá uno nuevo.' });
+    }
+
+    const data = JSON.parse(raw) as {
+      previewId: string;
+      userId: string;
+      garments: OutfitGarment[];
+      justification: string;
+      occasion?: string;
+      mood?: string;
+      weatherContext?: unknown;
+      items: { wardrobeItemId: Types.ObjectId; slot: string }[];
+      aiModel: string;
+      contextFactors: string[];
+      expiresAt: string;
+    };
+
+    const outfitDoc = await this.outfitModel.create({
+      userId: new Types.ObjectId(userId),
+      occasion: data.occasion,
+      mood: data.mood,
+      weatherContext: data.weatherContext,
+      items: data.items,
+      aiModel: data.aiModel,
+      justification: data.justification,
+      contextFactors: data.contextFactors,
+    });
+
+    await this.redisService.del(`outfit_preview:${userId}`);
+
+    return {
+      outfit: {
+        id: String(outfitDoc._id),
+        name: 'Outfit generado',
+        occasion: outfitDoc.occasion,
+        mood: outfitDoc.mood,
+        garments: data.garments,
+        justification: outfitDoc.justification,
+        contextFactors: outfitDoc.contextFactors,
+        createdAt: outfitDoc.createdAt,
+      },
+    };
   }
 
   async addFavorite(userId: string, outfitId: string): Promise<void> {
@@ -273,5 +359,57 @@ export class OutfitsService {
     );
 
     return { coverImageSource: newSource };
+  }
+
+  async swapGarment(
+    userId: string,
+    outfitId: string,
+    dto: SwapGarmentDto,
+  ): Promise<{ garment: OutfitGarment | null }> {
+    assertObjectId(userId, 'userId');
+    assertObjectId(outfitId, 'outfitId');
+
+    const outfit = await this.outfitModel
+      .findOne({ _id: new Types.ObjectId(outfitId), userId: new Types.ObjectId(userId) })
+      .lean();
+    if (!outfit) throw new NotFoundException({ error: 'NOT_FOUND' });
+
+    // Determine which wardrobe item is currently in this slot
+    const currentItem = outfit.items.find((i) => i.slot === dto.garmentSlot);
+    const currentItemId = currentItem ? String(currentItem.wardrobeItemId) : null;
+
+    // Build type filter — 'dress' is also valid for 'top' slot
+    const typeFilter: string[] = [dto.garmentSlot as string];
+    if ((dto.garmentSlot as GarmentSlot) === 'top') typeFilter.push('dress');
+
+    const excludeSet = new Set<string>(dto.excludeIds ?? []);
+    if (currentItemId) excludeSet.add(currentItemId);
+
+    const candidates = await this.wardrobeItemModel
+      .find({
+        userId: new Types.ObjectId(userId),
+        type: { $in: typeFilter },
+        status: 'ready',
+        archived: false,
+        ...(excludeSet.size > 0 && {
+          _id: { $nin: [...excludeSet].map((id) => new Types.ObjectId(id)) },
+        }),
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!candidates.length) return { garment: null };
+
+    // Pick the first candidate (fallback — Gemini scoring can be added later)
+    const picked = candidates[0];
+    return {
+      garment: {
+        garmentId: String(picked._id),
+        thumbnailUrl: picked.imageProcessedUrl || picked.imageUrl || '',
+        type: picked.type || '',
+        color: picked.color || '',
+        style: dto.garmentSlot,
+      },
+    };
   }
 }
