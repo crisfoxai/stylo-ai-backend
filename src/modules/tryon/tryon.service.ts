@@ -11,12 +11,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
 import { TryonResult, TryonResultDocument } from './schemas/tryon-result.schema';
+import { TryOnBasePhoto, TryOnBasePhotoDocument } from './schemas/tryon-base-photo.schema';
 import { WardrobeItem, WardrobeItemDocument } from '../wardrobe/schemas/wardrobe-item.schema';
 import { AIService } from '../ai/ai.service';
 import { R2Service } from '../storage/r2.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TryonOutfitGarmentDto } from './dto/tryon.dto';
+
+const BASE_PHOTOS_LIMIT = 20;
 
 const CATEGORY_MAP: Record<string, string> = {
   // Canonical
@@ -93,6 +97,7 @@ export class TryonService {
 
   constructor(
     @InjectModel(TryonResult.name) private readonly tryonModel: Model<TryonResultDocument>,
+    @InjectModel(TryOnBasePhoto.name) private readonly basePhotoModel: Model<TryOnBasePhotoDocument>,
     @InjectModel(WardrobeItem.name) private readonly wardrobeModel: Model<WardrobeItemDocument>,
     private readonly aiService: AIService,
     private readonly r2Service: R2Service,
@@ -252,5 +257,78 @@ export class TryonService {
 
     this.logger.log(`[tryon/outfit] Done. creditsUsed=${creditsUsed} resultUrl=${currentImageUrl}`);
     return { resultImageUrl: currentImageUrl, creditsUsed };
+  }
+
+  // --- Base photos ---
+
+  private async serializeBasePhoto(doc: TryOnBasePhotoDocument): Promise<{
+    id: string;
+    url: string;
+    createdAt: Date;
+  }> {
+    const bucket = this.r2Service.bucketAvatars();
+    const url = await this.r2Service.getSignedReadUrl(bucket, doc.r2Key, 3600);
+    return { id: String(doc._id), url, createdAt: doc.createdAt };
+  }
+
+  async listBasePhotos(userId: string): Promise<{ photos: { id: string; url: string; createdAt: Date }[] }> {
+    const docs = await this.basePhotoModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .limit(BASE_PHOTOS_LIMIT)
+      .lean();
+
+    const photos = await Promise.all(
+      docs.map((d) => this.serializeBasePhoto(d as TryOnBasePhotoDocument)),
+    );
+    return { photos };
+  }
+
+  async uploadBasePhoto(userId: string, file: Express.Multer.File): Promise<{ id: string; url: string; createdAt: Date }> {
+    const { width, height } = await sharp(file.buffer).metadata();
+
+    // FIFO: delete oldest if at limit
+    const count = await this.basePhotoModel.countDocuments({ userId: new Types.ObjectId(userId) });
+    if (count >= BASE_PHOTOS_LIMIT) {
+      const oldest = await this.basePhotoModel
+        .findOne({ userId: new Types.ObjectId(userId) })
+        .sort({ createdAt: 1 })
+        .lean();
+      if (oldest) {
+        await Promise.all([
+          this.basePhotoModel.deleteOne({ _id: oldest._id }),
+          this.r2Service.deleteObject(this.r2Service.bucketAvatars(), oldest.r2Key).catch(() => {}),
+        ]);
+      }
+    }
+
+    const bucket = this.r2Service.bucketAvatars();
+    const r2Key = `users/${userId}/try-on-base-photos/${new Date().toISOString()}.jpg`;
+    await this.r2Service.uploadStream(bucket, r2Key, file.buffer, file.mimetype);
+
+    const doc = await this.basePhotoModel.create({
+      userId: new Types.ObjectId(userId),
+      r2Key,
+      fileSize: file.size,
+      width: width ?? 0,
+      height: height ?? 0,
+    });
+
+    return this.serializeBasePhoto(doc);
+  }
+
+  async deleteBasePhoto(userId: string, photoId: string): Promise<void> {
+    if (!Types.ObjectId.isValid(photoId)) throw new BadRequestException({ error: 'INVALID_ID' });
+
+    const doc = await this.basePhotoModel.findOne({
+      _id: new Types.ObjectId(photoId),
+      userId: new Types.ObjectId(userId),
+    }).lean();
+    if (!doc) throw new NotFoundException({ error: 'NOT_FOUND' });
+
+    await Promise.all([
+      this.basePhotoModel.deleteOne({ _id: doc._id }),
+      this.r2Service.deleteObject(this.r2Service.bucketAvatars(), doc.r2Key).catch(() => {}),
+    ]);
   }
 }

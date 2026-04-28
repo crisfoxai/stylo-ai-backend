@@ -13,6 +13,7 @@ import { Outfit, OutfitSchema } from '../outfits/schemas/outfit.schema';
 import { WornEntry, WornEntrySchema } from '../outfits/schemas/worn-entry.schema';
 import { FavoriteOutfit, FavoriteOutfitSchema } from '../outfits/schemas/favorite-outfit.schema';
 import { TryonResult, TryonResultSchema } from '../tryon/schemas/tryon-result.schema';
+import { TryOnBasePhoto, TryOnBasePhotoSchema } from '../tryon/schemas/tryon-base-photo.schema';
 import { Subscription, SubscriptionSchema } from '../subscriptions/schemas/subscription.schema';
 import { PushToken, PushTokenSchema } from '../notifications/schemas/push-token.schema';
 import { Favorite, FavoriteSchema } from '../favorites/schemas/favorite.schema';
@@ -34,6 +35,7 @@ import { PurchaseHistory, PurchaseHistorySchema } from '../subscriptions/schemas
       { name: Favorite.name, schema: FavoriteSchema },
       { name: StyleProfile.name, schema: StyleProfileSchema },
       { name: PurchaseHistory.name, schema: PurchaseHistorySchema },
+      { name: TryOnBasePhoto.name, schema: TryOnBasePhotoSchema },
     ]),
     AuthModule,
     StyleProfileModule,

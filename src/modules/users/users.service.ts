@@ -7,6 +7,7 @@ import { User, UserDocument, NotificationPreferences } from './schemas/user.sche
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateNotificationPreferencesDto } from './dto/notification-preferences.dto';
 import { PurchaseHistory, PurchaseHistoryDocument } from '../subscriptions/schemas/purchase-history.schema';
+import { TryOnBasePhoto, TryOnBasePhotoDocument } from '../tryon/schemas/tryon-base-photo.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { StyleProfileService } from '../style-profile/style-profile.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -40,6 +41,7 @@ export class UsersService {
     @InjectModel(Favorite.name) private readonly favoriteModel: Model<HydratedDocument<Favorite>>,
     @InjectModel(StyleProfile.name) private readonly styleProfileModel: Model<StyleProfileDocument>,
     @InjectModel(PurchaseHistory.name) private readonly purchaseHistoryModel: Model<PurchaseHistoryDocument>,
+    @InjectModel(TryOnBasePhoto.name) private readonly tryOnBasePhotoModel: Model<TryOnBasePhotoDocument>,
     private readonly styleProfileService: StyleProfileService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly r2Service: R2Service,
@@ -136,6 +138,7 @@ export class UsersService {
       this.favoriteModel.deleteMany({ userId: oid }),
       this.styleProfileModel.deleteOne({ userId: oid }),
       this.purchaseHistoryModel.deleteMany({ userId: oid }),
+      this.tryOnBasePhotoModel.deleteMany({ userId: oid }),
     ]);
 
     this.logger.log(`[hardDelete] MongoDB data deleted for userId=${userId}`);
