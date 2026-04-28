@@ -19,10 +19,26 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TryonOutfitDto } from './dto/tryon.dto';
 
 const CATEGORY_MAP: Record<string, string> = {
+  // Canonical
   top: 'upper_body',
   bottom: 'lower_body',
   outerwear: 'upper_body',
   dress: 'dresses',
+  // Aliases — lower body
+  pants: 'lower_body',
+  pant: 'lower_body',
+  jeans: 'lower_body',
+  trousers: 'lower_body',
+  shorts: 'lower_body',
+  skirt: 'lower_body',
+  // Aliases — upper body
+  shirt: 'upper_body',
+  tshirt: 'upper_body',
+  blouse: 'upper_body',
+  sweater: 'upper_body',
+  hoodie: 'upper_body',
+  jacket: 'upper_body',
+  coat: 'upper_body',
 };
 
 const TYPE_EN: Record<string, string> = {
@@ -45,10 +61,11 @@ const TYPE_EN: Record<string, string> = {
 };
 
 function mapCategoryToVton(mongoCategory: string): string {
-  const mapped = CATEGORY_MAP[mongoCategory];
+  const key = (mongoCategory ?? '').toLowerCase().replace(/[-_\s]/g, '');
+  const mapped = CATEGORY_MAP[key];
   if (!mapped) {
     throw new BadRequestException(
-      `Try-on not available for category: ${mongoCategory}. Supported: top, bottom, outerwear, dress.`,
+      `Try-on not available for category: ${mongoCategory}. Supported: top, bottom, outerwear, dress (and common aliases).`,
     );
   }
   return mapped;
@@ -161,11 +178,11 @@ export class TryonService {
       throw new BadRequestException('Debés seleccionar al menos una prenda.');
     }
 
-    const SUPPORTED = ['top', 'bottom', 'outerwear', 'dress'];
     for (const g of dto.garments) {
-      if (!SUPPORTED.includes(g.category)) {
+      const normalized = (g.category ?? '').toLowerCase().replace(/[-_\s]/g, '');
+      if (!CATEGORY_MAP[normalized]) {
         throw new BadRequestException(
-          `Categoría no soportada para try-on: ${g.category}. Soportadas: top, bottom, outerwear, dress.`,
+          `Categoría no soportada para try-on: ${g.category}. Soportadas: top, bottom, outerwear, dress (y aliases comunes).`,
         );
       }
     }
