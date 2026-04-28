@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, UnsupportedMediaTypeException, PayloadTooLargeException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
-import { v4 as uuidv4 } from 'uuid';
-import { RedisService } from '../redis/redis.service';
+import { OutfitPreview, OutfitPreviewDocument } from './schemas/outfit-preview.schema';
 import sharp from 'sharp';
 import { Outfit, OutfitDocument } from './schemas/outfit.schema';
 import { FavoriteOutfit, FavoriteOutfitDocument } from './schemas/favorite-outfit.schema';
@@ -27,15 +26,15 @@ export class OutfitsService {
     @InjectModel(Outfit.name) private readonly outfitModel: Model<OutfitDocument>,
     @InjectModel(FavoriteOutfit.name) private readonly favoriteModel: Model<FavoriteOutfitDocument>,
     @InjectModel(WornEntry.name) private readonly wornModel: Model<WornEntryDocument>,
+    @InjectModel(OutfitPreview.name) private readonly previewModel: Model<OutfitPreviewDocument>,
     @InjectModel(WardrobeItem.name) private readonly wardrobeItemModel: Model<WardrobeItemDocument>,
     private readonly generator: OutfitsGenerator,
     private readonly weatherService: WeatherService,
     private readonly usersService: UsersService,
     private readonly r2Service: R2Service,
-    private readonly redisService: RedisService,
   ) {}
 
-  // POST /outfits/generate — generates outfit preview and stores in Redis (no Mongo persistence)
+  // POST /outfits/generate — generates outfit preview and stores in outfitpreviews (no outfits persistence)
   async generate(userId: string, dto: GenerateOutfitDto): Promise<{
     preview: { previewId: string; garments: OutfitGarment[]; justification: string; expiresAt: string };
   }> {
@@ -56,91 +55,77 @@ export class OutfitsService {
       dto,
     );
 
-    const previewId = uuidv4();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-    const previewData = {
-      previewId,
-      userId,
-      garments: composition.garments,
-      justification: composition.justification,
-      occasion: dto.occasion,
-      mood: dto.mood,
-      weatherContext: dto.weatherContext ?? weather,
-      items: composition.items,
-      aiModel: composition.aiModel,
-      contextFactors: composition.contextFactors,
-      expiresAt,
-    };
-
-    await this.redisService.set(`outfit_preview:${userId}`, JSON.stringify(previewData), 1800);
+    const preview = await this.previewModel.findOneAndUpdate(
+      { userId: new Types.ObjectId(userId) },
+      {
+        $set: {
+          garments: composition.garments,
+          justification: composition.justification,
+          items: composition.items,
+          aiModel: composition.aiModel,
+          contextFactors: composition.contextFactors,
+          weatherContext: dto.weatherContext ?? weather,
+          occasion: dto.occasion,
+          mood: dto.mood,
+          expiresAt,
+        },
+      },
+      { upsert: true, new: true },
+    );
 
     return {
       preview: {
-        previewId,
+        previewId: String(preview!._id),
         garments: composition.garments,
         justification: composition.justification,
-        expiresAt,
+        expiresAt: expiresAt.toISOString(),
       },
     };
   }
 
-  // GET /outfits/preview — recovery: get current preview from Redis
+  // GET /outfits/preview — recovery: get current active preview from MongoDB
   async getPreview(userId: string): Promise<{
     preview: { previewId: string; garments: OutfitGarment[]; justification: string; expiresAt: string };
   } | null> {
-    const raw = await this.redisService.get(`outfit_preview:${userId}`);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as {
-      previewId: string;
-      garments: OutfitGarment[];
-      justification: string;
-      expiresAt: string;
-    };
+    const doc = await this.previewModel
+      .findOne({ userId: new Types.ObjectId(userId), expiresAt: { $gt: new Date() } })
+      .lean();
+    if (!doc) return null;
     return {
       preview: {
-        previewId: data.previewId,
-        garments: data.garments,
-        justification: data.justification,
-        expiresAt: data.expiresAt,
+        previewId: String(doc._id),
+        garments: doc.garments as OutfitGarment[],
+        justification: doc.justification ?? '',
+        expiresAt: doc.expiresAt.toISOString(),
       },
     };
   }
 
-  // POST /outfits — persist from preview stored in Redis
+  // POST /outfits — persist from preview stored in outfitpreviews
   async persistPreview(userId: string): Promise<{ outfit: Record<string, unknown> }> {
     assertObjectId(userId, 'userId');
-    const raw = await this.redisService.get(`outfit_preview:${userId}`);
-    if (!raw) {
+    const preview = await this.previewModel
+      .findOne({ userId: new Types.ObjectId(userId), expiresAt: { $gt: new Date() } })
+      .lean();
+
+    if (!preview) {
       throw new BadRequestException({ error: 'preview_expired', message: 'El preview expiró. Generá uno nuevo.' });
     }
 
-    const data = JSON.parse(raw) as {
-      previewId: string;
-      userId: string;
-      garments: OutfitGarment[];
-      justification: string;
-      occasion?: string;
-      mood?: string;
-      weatherContext?: unknown;
-      items: { wardrobeItemId: Types.ObjectId; slot: string }[];
-      aiModel: string;
-      contextFactors: string[];
-      expiresAt: string;
-    };
-
     const outfitDoc = await this.outfitModel.create({
       userId: new Types.ObjectId(userId),
-      occasion: data.occasion,
-      mood: data.mood,
-      weatherContext: data.weatherContext,
-      items: data.items,
-      aiModel: data.aiModel,
-      justification: data.justification,
-      contextFactors: data.contextFactors,
+      occasion: preview.occasion,
+      mood: preview.mood,
+      weatherContext: preview.weatherContext,
+      items: preview.items,
+      aiModel: preview.aiModel,
+      justification: preview.justification,
+      contextFactors: preview.contextFactors,
     });
 
-    await this.redisService.del(`outfit_preview:${userId}`);
+    await this.previewModel.deleteOne({ _id: preview._id });
 
     return {
       outfit: {
@@ -148,7 +133,7 @@ export class OutfitsService {
         name: 'Outfit generado',
         occasion: outfitDoc.occasion,
         mood: outfitDoc.mood,
-        garments: data.garments,
+        garments: preview.garments,
         justification: outfitDoc.justification,
         contextFactors: outfitDoc.contextFactors,
         createdAt: outfitDoc.createdAt,

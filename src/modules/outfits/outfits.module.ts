@@ -4,6 +4,7 @@ import { OutfitsController } from './outfits.controller';
 import { OutfitsService } from './outfits.service';
 import { OutfitsGenerator } from './outfits.generator';
 import { Outfit, OutfitSchema } from './schemas/outfit.schema';
+import { OutfitPreview, OutfitPreviewSchema } from './schemas/outfit-preview.schema';
 import { FavoriteOutfit, FavoriteOutfitSchema } from './schemas/favorite-outfit.schema';
 import { WornEntry, WornEntrySchema } from './schemas/worn-entry.schema';
 import { WardrobeItem, WardrobeItemSchema } from '../wardrobe/schemas/wardrobe-item.schema';
@@ -16,6 +17,7 @@ import { StorageModule } from '../storage/storage.module';
   imports: [
     MongooseModule.forFeature([
       { name: Outfit.name, schema: OutfitSchema },
+      { name: OutfitPreview.name, schema: OutfitPreviewSchema },
       { name: FavoriteOutfit.name, schema: FavoriteOutfitSchema },
       { name: WornEntry.name, schema: WornEntrySchema },
       { name: WardrobeItem.name, schema: WardrobeItemSchema },
