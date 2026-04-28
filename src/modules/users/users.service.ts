@@ -3,8 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, HydratedDocument } from 'mongoose';
 import * as admin from 'firebase-admin';
 import { ConfigService } from '@nestjs/config';
-import { User, UserDocument } from './schemas/user.schema';
+import { User, UserDocument, NotificationPreferences } from './schemas/user.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateNotificationPreferencesDto } from './dto/notification-preferences.dto';
+import { PurchaseHistory, PurchaseHistoryDocument } from '../subscriptions/schemas/purchase-history.schema';
+import { v4 as uuidv4 } from 'uuid';
 import { StyleProfileService } from '../style-profile/style-profile.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { R2Service } from '../storage/r2.service';
@@ -36,6 +39,7 @@ export class UsersService {
     @InjectModel(PushToken.name) private readonly pushTokenModel: Model<PushTokenDocument>,
     @InjectModel(Favorite.name) private readonly favoriteModel: Model<HydratedDocument<Favorite>>,
     @InjectModel(StyleProfile.name) private readonly styleProfileModel: Model<StyleProfileDocument>,
+    @InjectModel(PurchaseHistory.name) private readonly purchaseHistoryModel: Model<PurchaseHistoryDocument>,
     private readonly styleProfileService: StyleProfileService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly r2Service: R2Service,
@@ -68,6 +72,53 @@ export class UsersService {
     return this.subscriptionsService.getTryonStats(userId);
   }
 
+  async updateNotificationPreferences(
+    userId: string,
+    dto: UpdateNotificationPreferencesDto,
+  ): Promise<NotificationPreferences> {
+    const updates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(dto)) {
+      if (value !== undefined) updates[`notificationPreferences.${key}`] = value;
+    }
+    const user = await this.userModel
+      .findByIdAndUpdate(userId, { $set: updates }, { new: true })
+      .lean();
+    if (!user) throw new NotFoundException({ error: 'NOT_FOUND' });
+    return (user as UserDocument).notificationPreferences;
+  }
+
+  async getPurchaseHistory(userId: string) {
+    const oid = new Types.ObjectId(userId);
+    const all = await this.purchaseHistoryModel
+      .find({ userId: oid })
+      .sort({ purchaseDate: -1 })
+      .lean();
+    const active = all.filter((p) => p.status === 'active');
+    return {
+      active: active.length > 0 ? active : null,
+      history: all,
+    };
+  }
+
+  async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
+    const existing = await this.userModel.findById(userId).lean();
+    if (!existing) throw new NotFoundException({ error: 'NOT_FOUND' });
+
+    const bucket = this.r2Service.bucketAvatars();
+    const key = `users/${userId}/avatar/${uuidv4()}.jpg`;
+    const avatarUrl = await this.r2Service.uploadStream(bucket, key, file.buffer, file.mimetype);
+
+    await this.userModel.findByIdAndUpdate(userId, { $set: { photoUrl: avatarUrl } });
+
+    // Delete previous avatar — best-effort
+    if (existing.photoUrl?.includes(`users/${userId}/avatar/`)) {
+      const oldKey = existing.photoUrl.split('/').slice(-4).join('/');
+      this.r2Service.deleteObject(bucket, oldKey).catch(() => {});
+    }
+
+    return avatarUrl;
+  }
+
   async hardDelete(userId: string, firebaseUid: string): Promise<void> {
     const oid = new Types.ObjectId(userId);
 
@@ -84,6 +135,7 @@ export class UsersService {
       this.pushTokenModel.deleteMany({ userId: oid }),
       this.favoriteModel.deleteMany({ userId: oid }),
       this.styleProfileModel.deleteOne({ userId: oid }),
+      this.purchaseHistoryModel.deleteMany({ userId: oid }),
     ]);
 
     this.logger.log(`[hardDelete] MongoDB data deleted for userId=${userId}`);
@@ -93,6 +145,7 @@ export class UsersService {
       { bucket: this.r2Service.bucketWardrobe(), prefix: `${userId}/` },
       { bucket: this.r2Service.bucketTryon(), prefix: `tryon/${userId}/` },
       { bucket: this.r2Service.bucketAvatars(), prefix: `tryon/${userId}/` },
+      { bucket: this.r2Service.bucketAvatars(), prefix: `users/${userId}/` },
     ];
     await Promise.all(
       r2Deletions.map(({ bucket, prefix }) =>

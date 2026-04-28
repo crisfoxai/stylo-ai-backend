@@ -17,6 +17,7 @@ import { Subscription, SubscriptionSchema } from '../subscriptions/schemas/subsc
 import { PushToken, PushTokenSchema } from '../notifications/schemas/push-token.schema';
 import { Favorite, FavoriteSchema } from '../favorites/schemas/favorite.schema';
 import { StyleProfile, StyleProfileSchema } from '../style-profile/schemas/style-profile.schema';
+import { PurchaseHistory, PurchaseHistorySchema } from '../subscriptions/schemas/purchase-history.schema';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { StyleProfile, StyleProfileSchema } from '../style-profile/schemas/style
       { name: PushToken.name, schema: PushTokenSchema },
       { name: Favorite.name, schema: FavoriteSchema },
       { name: StyleProfile.name, schema: StyleProfileSchema },
+      { name: PurchaseHistory.name, schema: PurchaseHistorySchema },
     ]),
     AuthModule,
     StyleProfileModule,
