@@ -22,6 +22,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { ShareModule } from './modules/share/share.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
         ANTHROPIC_API_KEY: Joi.string().optional(),
         REPLICATE_API_TOKEN: Joi.string().optional(),
         SENTRY_DSN_BACKEND: Joi.string().optional(),
+        REDIS_URL: Joi.string().optional(),
       }),
     }),
     MongooseModule.forRootAsync({
@@ -68,6 +70,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
       },
     ]),
     ScheduleModule.forRoot(),
+    RedisModule,
     AuthModule,
     UsersModule,
     WardrobeModule,
