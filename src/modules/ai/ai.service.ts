@@ -14,6 +14,11 @@ export interface ClassifyResult {
   category: string;
   material: string;
   confidence: number;
+  materials?: string[];
+  style?: string;
+  fit?: string;
+  occasions?: string[];
+  seasons?: string[];
 }
 
 export interface RemoveBgResult {
@@ -31,6 +36,10 @@ export interface DetectedGarment {
   categoria: string;
   material: string | null;
   fit: string | null;
+  materials: string[];
+  style: string | null;
+  occasions: string[];
+  seasons: string[];
 }
 
 // Fallback classification when AI fails — keeps the pipeline moving
@@ -49,13 +58,19 @@ const QA_TEST_IMAGE_URL =
 
 const CLASSIFY_PROMPT =
   'Analyze this clothing item and respond with ONLY valid JSON, no markdown, no explanation: ' +
-  '{"name": string, "type": string, "category": string, "color": string, "material": string, "confidence": number}. ' +
+  '{"name": string, "type": string, "category": string, "color": string, "material": string, "confidence": number, ' +
+  '"materials": string[], "style": string, "fit": string, "occasions": string[], "seasons": string[]}. ' +
   'name: descriptive name in Spanish, e.g. "Remera gris de algodón", "Pantalón negro de jean", "Zapatillas blancas". ' +
   'type options: top/bottom/shoes/outerwear/accessory. ' +
   'category: shirt/pants/dress/jacket/sneakers/boots/bag/hat/etc. ' +
   'color: main color name in English. ' +
   'material: cotton/polyester/leather/denim/wool/silk/synthetic/etc. ' +
-  'confidence: 0.0-1.0 float indicating classification confidence.';
+  'confidence: 0.0-1.0 float indicating classification confidence. ' +
+  'materials: array from [cotton, polyester, wool, silk, linen, denim, leather, synthetic, cashmere, velvet, spandex, fleece, nylon]. ' +
+  'style: one of casual/formal/sport/elegant/smart-casual/beach/street/bohemian/minimalist/classic. ' +
+  'fit: one of slim/regular/relaxed/oversized/skinny. ' +
+  'occasions: array from [casual, everyday, work, business, sport, gym, night-out, party, dinner, date, formal, gala, beach, vacation]. ' +
+  'seasons: array from [spring, summer, fall, winter].';
 
 @Injectable()
 export class AIService {
@@ -234,6 +249,11 @@ export class AIService {
         color: String(parsed.color ?? 'unknown'),
         material: String(parsed.material ?? 'unknown'),
         confidence: Number(parsed.confidence ?? 0.8),
+        ...(Array.isArray(parsed.materials) && parsed.materials.length && { materials: parsed.materials as string[] }),
+        ...(parsed.style && { style: String(parsed.style) }),
+        ...(parsed.fit && { fit: String(parsed.fit) }),
+        ...(Array.isArray(parsed.occasions) && parsed.occasions.length && { occasions: parsed.occasions as string[] }),
+        ...(Array.isArray(parsed.seasons) && parsed.seasons.length && { seasons: parsed.seasons as string[] }),
       };
     } catch (err) {
       this.logger.error(`Gemini classify failed: ${(err as Error).message}`);
@@ -284,7 +304,103 @@ export class AIService {
 - material (estimated if visible: cotton, denim, leather, wool, synthetic, linen, silk, polyester, blend — null if not determinable)
 - fit (slim | regular | oversize | relaxed | cropped — null if not applicable or not determinable)
 
-Return ONLY a valid JSON array with no additional text. Maximum 8 items. If there is no person or no visible clothing, return [].`;
+Additionally, analyze each garment and determine:
+
+- materials: list of materials that appear from the texture and visual appearance.
+  Possible values: ["cotton", "polyester", "wool", "silk", "linen", "denim",
+  "leather", "synthetic", "cashmere", "velvet", "spandex", "fleece", "nylon"]
+
+- style: general style of the garment.
+  Possible values: "casual", "formal", "sport", "elegant", "smart-casual",
+  "beach", "street", "bohemian", "minimalist", "classic"
+
+- occasions: for which occasions this garment is appropriate. Pick all that apply.
+  Possible values: ["casual", "everyday", "work", "business", "sport", "gym",
+  "night-out", "party", "dinner", "date", "formal", "gala", "beach", "vacation"]
+
+- seasons: in which seasons this garment is appropriate. Pick all that apply.
+  Possible values: ["spring", "summer", "fall", "winter"]
+
+Examples:
+- A basic black t-shirt: style="casual", occasions=["casual","everyday","night-out"], seasons=["spring","summer","fall"]
+- A black blazer: style="smart-casual", occasions=["work","dinner","party","formal"], seasons=["spring","fall","winter"]
+- Sport leggings: style="sport", occasions=["gym","sport"], seasons=["spring","summer","fall","winter"]
+- A white linen dress: style="casual", occasions=["casual","beach","dinner"], seasons=["spring","summer"]
+
+Return ONLY a valid JSON array with no additional text. Maximum 8 items. If there is no person or no visible clothing, return [].
+
+Each object must have: tipo, color, descripcion, categoria, material, fit, materials, style, occasions, seasons.`;
+
+  async enrichGarmentAttributes(input: {
+    imageUrl: string;
+    category: string;
+    name: string;
+    color: string;
+  }): Promise<{ materials: string[]; style: string; fit: string; occasions: string[]; seasons: string[] } | null> {
+    if (!this.anthropicClient) {
+      this.logger.warn('enrichGarmentAttributes: Anthropic client not available');
+      return null;
+    }
+
+    const prompt = `Tarea: clasificar atributos de moda de una prenda.
+
+Categoría: ${input.category}
+Nombre: ${input.name}
+Color: ${input.color}
+
+Devolvé SOLO JSON válido con:
+{
+  "materials": ["cotton"],
+  "style": "casual",
+  "fit": "regular",
+  "occasions": ["casual", "everyday"],
+  "seasons": ["spring", "summer", "fall"]
+}
+
+Valores válidos:
+- materials: cotton, polyester, wool, silk, linen, denim, leather, synthetic, cashmere, velvet, spandex, fleece, nylon
+- style: casual, formal, sport, elegant, smart-casual, beach, street, bohemian, minimalist, classic
+- fit: slim, regular, relaxed, oversized, skinny
+- occasions: casual, everyday, work, business, sport, gym, night-out, party, dinner, date, formal, gala, beach, vacation
+- seasons: spring, summer, fall, winter`;
+
+    try {
+      const response = await this.anthropicClient.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'url', url: input.imageUrl } },
+            { type: 'text', text: prompt },
+          ],
+        }],
+      });
+
+      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
+      const jsonText = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+      const parsed = JSON.parse(jsonText);
+      return {
+        materials: Array.isArray(parsed.materials) ? parsed.materials : [],
+        style: String(parsed.style ?? 'casual'),
+        fit: String(parsed.fit ?? 'regular'),
+        occasions: Array.isArray(parsed.occasions) ? parsed.occasions : [],
+        seasons: Array.isArray(parsed.seasons) ? parsed.seasons : [],
+      };
+    } catch (err) {
+      this.logger.error(`enrichGarmentAttributes failed: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  async generateTextContent(prompt: string): Promise<string> {
+    if (!this.geminiClient) {
+      throw new Error('Gemini client not configured — cannot generate text content');
+    }
+    const model = this.geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  }
 
   async detectGarments(imageBuffer: Buffer, mimeType: string): Promise<DetectedGarment[]> {
     if (!this.anthropicClient) {

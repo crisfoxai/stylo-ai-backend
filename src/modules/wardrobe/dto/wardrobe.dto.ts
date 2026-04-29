@@ -66,6 +66,8 @@ export class ConfirmedGarmentDto {
   @ApiProperty() @IsString() descripcion!: string;
   @ApiProperty() @IsString() categoria!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() material?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) materials?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() style?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() fit?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) seasons?: string[];
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) occasions?: string[];

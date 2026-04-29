@@ -53,6 +53,9 @@ export class WardrobeItem {
   materials!: string[];
 
   @Prop({ type: String, default: null })
+  style!: string | null;
+
+  @Prop({ type: String, default: null })
   fit!: string | null;
 
   @Prop({ type: [String], default: [] })

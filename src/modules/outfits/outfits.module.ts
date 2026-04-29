@@ -12,6 +12,7 @@ import { WeatherModule } from '../weather/weather.module';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { StorageModule } from '../storage/storage.module';
+import { AIModule } from '../ai/ai.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { StorageModule } from '../storage/storage.module';
     UsersModule,
     AuthModule,
     StorageModule,
+    AIModule,
   ],
   controllers: [OutfitsController],
   providers: [OutfitsService, OutfitsGenerator],
