@@ -10,7 +10,6 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiBody, ApiHeader } from '@nestjs/swagger';
 import { IsOptional, IsString, IsNumber, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -19,12 +18,11 @@ import { WardrobeEnrichmentService } from './wardrobe-enrichment.service';
 
 @Injectable()
 export class AdminTokenGuard implements CanActivate {
-  constructor(private readonly configService: ConfigService) {}
-
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
-    const token = req.headers['x-admin-token'];
-    const expected = this.configService.get<string>('ADMIN_TOKEN');
+    const raw = req.headers['x-admin-token'];
+    const token = (Array.isArray(raw) ? raw[0] : raw ?? '').trim();
+    const expected = (process.env['ADMIN_TOKEN'] ?? '').trim();
     if (!expected || token !== expected) {
       throw new UnauthorizedException({ error: 'INVALID_ADMIN_TOKEN' });
     }
@@ -48,10 +46,7 @@ class EnrichAttributesDto {
 @ApiTags('admin')
 @Controller('admin/wardrobe')
 export class WardrobeEnrichmentController {
-  constructor(
-    private readonly enrichmentService: WardrobeEnrichmentService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly enrichmentService: WardrobeEnrichmentService) {}
 
   @Post('enrich-attributes')
   @HttpCode(HttpStatus.OK)
