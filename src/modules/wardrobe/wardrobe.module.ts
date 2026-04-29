@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { WardrobeController } from './wardrobe.controller';
 import { WardrobeService } from './wardrobe.service';
 import { WardrobeEnrichmentService } from './wardrobe-enrichment.service';
-import { WardrobeEnrichmentController } from './wardrobe-enrichment.controller';
+import { WardrobeEnrichmentController, AdminTokenGuard } from './wardrobe-enrichment.controller';
 import { WardrobeItem, WardrobeItemSchema } from './schemas/wardrobe-item.schema';
 import { WardrobeJob, WardrobeJobSchema } from './schemas/wardrobe-job.schema';
 import { AIModule } from '../ai/ai.module';
@@ -21,7 +21,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [WardrobeController, WardrobeEnrichmentController],
-  providers: [WardrobeService, WardrobeEnrichmentService],
+  providers: [WardrobeService, WardrobeEnrichmentService, AdminTokenGuard],
   exports: [WardrobeService],
 })
 export class WardrobeModule {}

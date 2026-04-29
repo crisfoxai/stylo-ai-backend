@@ -53,6 +53,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
         ANTHROPIC_API_KEY: Joi.string().optional(),
         REPLICATE_API_TOKEN: Joi.string().optional(),
         SENTRY_DSN_BACKEND: Joi.string().optional(),
+        ADMIN_TOKEN: Joi.string().optional(),
       }),
     }),
     MongooseModule.forRootAsync({
