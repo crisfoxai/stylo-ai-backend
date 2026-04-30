@@ -26,6 +26,19 @@ async function bootstrap() {
     });
   }
 
+  const corsOrigins = configService.get<string>('CORS_ORIGINS');
+  if (corsOrigins && corsOrigins !== '*') {
+    const allowedOrigins = corsOrigins.split(',').map((o) => o.trim()).filter(Boolean);
+    app.enableCors({
+      origin: allowedOrigins,
+      methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'x-admin-token'],
+      credentials: true,
+    });
+  } else if (!isProduction) {
+    app.enableCors({ origin: true });
+  }
+
   app.use(compression());
   app.use(RequestIdMiddleware);
 
