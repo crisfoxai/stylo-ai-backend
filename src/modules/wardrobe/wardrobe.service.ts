@@ -56,17 +56,17 @@ export class WardrobeService {
       }),
     ]);
 
-    this.runAIPipeline(String(item._id), jobId, imageUrl).catch(() => {
+    this.runAIPipeline(String(item._id), jobId, imageUrl, userId).catch(() => {
       // fire-and-forget
     });
 
     return { jobId, status: 'processing' };
   }
 
-  private async runAIPipeline(itemId: string, jobId: string, imageUrl: string): Promise<void> {
+  private async runAIPipeline(itemId: string, jobId: string, imageUrl: string, userId?: string): Promise<void> {
     try {
       const [classifyResult, removeBgResult] = await Promise.all([
-        this.aiService.classify(imageUrl),
+        this.aiService.classify(imageUrl, userId),
         this.aiService.removeBg(imageUrl),
       ]);
 
@@ -202,6 +202,7 @@ export class WardrobeService {
 
   async detectFromPhoto(
     file: Express.Multer.File,
+    userId?: string,
   ): Promise<{ detected: DetectedGarment[]; photoKey: string }> {
     const bucket = this.r2Service.bucketWardrobe();
     const photoKey = `wardrobe/detections/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
@@ -210,7 +211,7 @@ export class WardrobeService {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    const detected = await this.aiService.detectGarments(file.buffer, file.mimetype);
+    const detected = await this.aiService.detectGarments(file.buffer, file.mimetype, userId);
 
     if (detected.length === 0) {
       throw new UnprocessableEntityException({ error: 'NO_GARMENTS_DETECTED' });

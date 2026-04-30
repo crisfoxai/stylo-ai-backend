@@ -156,7 +156,7 @@ export class TryonService {
 
     let resultUrl: string;
     try {
-      const result = await this.aiService.tryon(userPhotoUrl, [garmentUrl], garmentDes, vtonCategory);
+      const result = await this.aiService.tryon(userPhotoUrl, [garmentUrl], garmentDes, vtonCategory, userId);
       resultUrl = result.resultUrl;
       this.logger.log(`[tryon] Success resultUrl=${resultUrl}`);
     } catch (err) {
@@ -267,7 +267,7 @@ export class TryonService {
       this.logger.log(`[tryon/outfit] Processing garment=${g.garmentId} category=${vtonCategory} des="${garmentDes}"`);
 
       try {
-        const result = await this.aiService.tryon(currentImageUrl, [garmentUrl], garmentDes, vtonCategory);
+        const result = await this.aiService.tryon(currentImageUrl, [garmentUrl], garmentDes, vtonCategory, userId);
         currentImageUrl = result.resultUrl;
         creditsUsed++;
         await this.subscriptionsService.decrementTryonCredit(userId);

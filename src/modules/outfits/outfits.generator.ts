@@ -312,7 +312,7 @@ export class OutfitsGenerator {
         filteredWardrobe: available,
       });
 
-      const raw = await this.aiService.generateTextContent(prompt);
+      const raw = await this.aiService.generateTextContent(prompt, userId);
       const jsonText = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
       const parsed = JSON.parse(jsonText) as { items: string[]; reasoning: string };
 

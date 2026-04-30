@@ -70,6 +70,7 @@ export class WardrobeEnrichmentService {
           category: item.category ?? '',
           name: item.name ?? '',
           color: item.color ?? '',
+          userId: String(item.userId),
         });
 
         if (!attrs) continue;

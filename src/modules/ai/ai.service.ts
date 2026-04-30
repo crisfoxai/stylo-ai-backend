@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -6,6 +6,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
 import Replicate from 'replicate';
 import Anthropic from '@anthropic-ai/sdk';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
 
 export interface ClassifyResult {
   name: string;
@@ -87,6 +88,7 @@ export class AIService {
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
+    @Optional() private readonly aiUsageService?: AiUsageService,
   ) {
     this.provider = configService.get<string>('AI_PROVIDER') ?? 'gemini';
     this.baseUrl = configService.get<string>('AI_SERVICE_URL') ?? '';
@@ -113,11 +115,10 @@ export class AIService {
     }
   }
 
-  async classify(imageUrl: string): Promise<ClassifyResult> {
+  async classify(imageUrl: string, userId?: string): Promise<ClassifyResult> {
     if (this.provider === 'gemini' && this.geminiClient) {
-      return this.classifyWithGemini(imageUrl);
+      return this.classifyWithGemini(imageUrl, userId);
     }
-    // mock / unknown provider
     return { ...FALLBACK_CLASSIFY };
   }
 
@@ -131,6 +132,7 @@ export class AIService {
     garmentUrls: string[],
     garmentDescription = 'garment',
     category = 'upper_body',
+    userId?: string,
   ): Promise<TryonResult> {
     if (!this.replicateClient) {
       if (this.provider === 'custom' && this.baseUrl) {
@@ -139,7 +141,12 @@ export class AIService {
       throw new Error('Replicate not configured — tryon unavailable');
     }
 
-    return this.runVtonWithRetry(userPhotoUrl, garmentUrls[0], garmentDescription, category);
+    const t0 = Date.now();
+    const result = await this.runVtonWithRetry(userPhotoUrl, garmentUrls[0], garmentDescription, category);
+    if (userId) {
+      this.logUsage(userId, 'replicate', 'idm-vton', 'tryon', 0, 0, 0.05, Date.now() - t0);
+    }
+    return result;
   }
 
   private async runVtonWithRetry(
@@ -216,7 +223,7 @@ export class AIService {
     throw new Error('Replicate prediction timed out after 2 minutes');
   }
 
-  private async classifyWithGemini(imageUrl: string): Promise<ClassifyResult> {
+  private async classifyWithGemini(imageUrl: string, userId?: string): Promise<ClassifyResult> {
     try {
       const effectiveUrl = imageUrl.startsWith('https://mock-storage/')
         ? QA_TEST_IMAGE_URL
@@ -232,13 +239,21 @@ export class AIService {
         (imageResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
 
       const model = this.geminiClient!.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const t0 = Date.now();
       const result = await model.generateContent([
         { inlineData: { data: base64Image, mimeType } },
         CLASSIFY_PROMPT,
       ]);
 
+      if (userId) {
+        const meta = result.response.usageMetadata;
+        const inputTokens = meta?.promptTokenCount ?? 800;
+        const outputTokens = meta?.candidatesTokenCount ?? 150;
+        const costUSD = inputTokens * 0.00000015 + outputTokens * 0.0000006;
+        this.logUsage(userId, 'gemini', 'gemini-2.5-flash', 'classify', inputTokens, outputTokens, costUSD, Date.now() - t0);
+      }
+
       const text = result.response.text().trim();
-      // Strip markdown code fences if Gemini adds them
       const jsonText = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
       const parsed = JSON.parse(jsonText) as ClassifyResult;
 
@@ -336,6 +351,7 @@ Each object must have: tipo, color, descripcion, categoria, material, fit, mater
     category: string;
     name: string;
     color: string;
+    userId?: string;
   }): Promise<{ materials: string[]; style: string; fit: string; occasions: string[]; seasons: string[] } | null> {
     if (!this.anthropicClient) {
       this.logger.warn('enrichGarmentAttributes: Anthropic client not available');
@@ -365,6 +381,7 @@ Valores válidos:
 - seasons: spring, summer, fall, winter`;
 
     try {
+      const t0 = Date.now();
       const response = await this.anthropicClient.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
@@ -376,6 +393,13 @@ Valores válidos:
           ],
         }],
       });
+
+      if (input.userId) {
+        const inputTokens = response.usage.input_tokens;
+        const outputTokens = response.usage.output_tokens;
+        const costUSD = inputTokens * 0.0000008 + outputTokens * 0.000004;
+        this.logUsage(input.userId, 'anthropic', 'claude-haiku-4-5-20251001', 'enrich', inputTokens, outputTokens, costUSD, Date.now() - t0);
+      }
 
       const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
       const jsonText = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
@@ -393,16 +417,26 @@ Valores válidos:
     }
   }
 
-  async generateTextContent(prompt: string): Promise<string> {
+  async generateTextContent(prompt: string, userId?: string): Promise<string> {
     if (!this.geminiClient) {
       throw new Error('Gemini client not configured — cannot generate text content');
     }
     const model = this.geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const t0 = Date.now();
     const result = await model.generateContent(prompt);
+
+    if (userId) {
+      const meta = result.response.usageMetadata;
+      const inputTokens = meta?.promptTokenCount ?? 500;
+      const outputTokens = meta?.candidatesTokenCount ?? 300;
+      const costUSD = inputTokens * 0.00000015 + outputTokens * 0.0000006;
+      this.logUsage(userId, 'gemini', 'gemini-2.5-flash', 'outfit-generation', inputTokens, outputTokens, costUSD, Date.now() - t0);
+    }
+
     return result.response.text().trim();
   }
 
-  async detectGarments(imageBuffer: Buffer, mimeType: string): Promise<DetectedGarment[]> {
+  async detectGarments(imageBuffer: Buffer, mimeType: string, userId?: string): Promise<DetectedGarment[]> {
     if (!this.anthropicClient) {
       this.logger.warn('detectGarments: Anthropic client not available, returning empty');
       return [];
@@ -413,6 +447,7 @@ Valores válidos:
       : 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 
     const base64 = imageBuffer.toString('base64');
+    const t0 = Date.now();
     const response = await this.anthropicClient.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
@@ -425,6 +460,13 @@ Valores válidos:
       }],
     });
 
+    if (userId) {
+      const inputTokens = response.usage.input_tokens;
+      const outputTokens = response.usage.output_tokens;
+      const costUSD = inputTokens * 0.000003 + outputTokens * 0.000015;
+      this.logUsage(userId, 'anthropic', 'claude-sonnet-4-6', 'detect-garments', inputTokens, outputTokens, costUSD, Date.now() - t0);
+    }
+
     const text = response.content[0].type === 'text' ? response.content[0].text : '[]';
     try {
       const raw = JSON.parse(text.trim());
@@ -432,6 +474,20 @@ Valores válidos:
     } catch {
       return [];
     }
+  }
+
+  private logUsage(
+    userId: string,
+    provider: string,
+    model: string,
+    endpoint: string,
+    inputTokens: number,
+    outputTokens: number,
+    costUSD: number,
+    durationMs?: number,
+  ): void {
+    if (!this.aiUsageService) return;
+    this.aiUsageService.log({ userId, provider, model, endpoint, inputTokens, outputTokens, estimatedCostUSD: costUSD, durationMs }).catch(() => {});
   }
 
   async ping(): Promise<void> {

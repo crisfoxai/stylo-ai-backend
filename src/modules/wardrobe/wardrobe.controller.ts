@@ -104,6 +104,7 @@ export class WardrobeController {
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Detect garments from body photo using Claude Vision' })
   async detectFromPhoto(
+    @CurrentUser() user: UserDocument,
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -114,7 +115,7 @@ export class WardrobeController {
     )
     file: Express.Multer.File,
   ) {
-    return this.wardrobeService.detectFromPhoto(file);
+    return this.wardrobeService.detectFromPhoto(file, String(user._id));
   }
 
   @Post('detect-from-photo/confirm')
