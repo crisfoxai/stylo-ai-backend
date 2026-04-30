@@ -24,6 +24,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { ShareModule } from './modules/share/share.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
+import { AiUsageModule } from './modules/ai-usage/ai-usage.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
         REPLICATE_API_TOKEN: Joi.string().optional(),
         SENTRY_DSN_BACKEND: Joi.string().optional(),
         ADMIN_TOKEN: Joi.string().optional(),
+        CORS_ORIGINS: Joi.string().optional(),
       }),
     }),
     MongooseModule.forRootAsync({
@@ -100,6 +102,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
     ChatModule,
     ShareModule,
     ReferralsModule,
+    AiUsageModule,
   ],
   providers: [
     {
