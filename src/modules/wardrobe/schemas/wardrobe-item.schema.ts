@@ -80,3 +80,5 @@ export class WardrobeItem {
 export const WardrobeItemSchema = SchemaFactory.createForClass(WardrobeItem);
 WardrobeItemSchema.index({ userId: 1, archived: 1, createdAt: -1 });
 WardrobeItemSchema.index({ userId: 1, category: 1, color: 1 });
+WardrobeItemSchema.index({ status: 1, archived: 1 });
+WardrobeItemSchema.index({ userId: 1, status: 1 });

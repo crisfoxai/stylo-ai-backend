@@ -17,3 +17,4 @@ export class WornEntry {
 
 export const WornEntrySchema = SchemaFactory.createForClass(WornEntry);
 WornEntrySchema.index({ userId: 1, wornDate: -1 });
+WornEntrySchema.index({ userId: 1, outfitId: 1 });
