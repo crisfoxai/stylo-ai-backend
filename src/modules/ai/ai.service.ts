@@ -492,7 +492,7 @@ Valores válidos:
 
   async ping(): Promise<void> {
     if (this.geminiClient) {
-      const model = this.geminiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model = this.geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
       await model.generateContent({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }], generationConfig: { maxOutputTokens: 1 } });
       return;
     }
