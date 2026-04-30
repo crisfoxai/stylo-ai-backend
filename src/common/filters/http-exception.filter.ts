@@ -17,7 +17,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const requestId = request.headers['x-request-id'] as string;
+    const requestId = String(request.headers['x-request-id'] ?? '');
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = 'INTERNAL';
@@ -34,8 +34,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
       } else {
         error = this.statusToError(status);
       }
+
+      if (status >= 500) {
+        this.logger.error(
+          JSON.stringify({ requestId, method: request.method, path: request.path, status, error }),
+          (exception as Error).stack,
+          HttpExceptionFilter.name,
+        );
+      } else if (status >= 400 && status !== 404 && status !== 429) {
+        this.logger.warn(
+          JSON.stringify({ requestId, method: request.method, path: request.path, status, error }),
+        );
+      }
     } else {
-      this.logger.error('Unhandled exception', exception as Error);
+      this.logger.error(
+        JSON.stringify({ requestId, method: request.method, path: request.path, status: 500, msg: 'Unhandled exception' }),
+        (exception as Error)?.stack,
+        HttpExceptionFilter.name,
+      );
       Sentry.captureException(exception);
     }
 

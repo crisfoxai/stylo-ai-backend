@@ -8,9 +8,13 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { JsonLogger } from './common/logger/json-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const isProduction = process.env['NODE_ENV'] === 'production';
+  const app = await NestFactory.create(AppModule, {
+    logger: new JsonLogger(isProduction ? 'log' : 'debug'),
+  });
 
   const configService = app.get(ConfigService);
   const sentryDsn = configService.get<string>('SENTRY_DSN_BACKEND');
@@ -48,7 +52,7 @@ async function bootstrap() {
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port, '0.0.0.0');
-  console.log(`Application running on port ${port}`);
+  process.stdout.write(JSON.stringify({ level: 'log', ts: new Date().toISOString(), msg: `Application running on port ${port}` }) + '\n');
 }
 
 bootstrap();
