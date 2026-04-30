@@ -1,8 +1,10 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AppThrottlerGuard } from './common/guards/throttler.guard';
 import * as Joi from 'joi';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -64,8 +66,19 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
     }),
     ThrottlerModule.forRoot([
       {
+        name: 'default',
         ttl: 60000,
-        limit: 60,
+        limit: 100,
+      },
+      {
+        name: 'ai',
+        ttl: 60000,
+        limit: 10,
+      },
+      {
+        name: 'upload',
+        ttl: 60000,
+        limit: 15,
       },
     ]),
     ScheduleModule.forRoot(),
@@ -87,6 +100,12 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
     ChatModule,
     ShareModule,
     ReferralsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: AppThrottlerGuard,
+    },
   ],
 })
 export class AppModule implements NestModule {

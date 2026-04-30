@@ -15,6 +15,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { TryonService } from './tryon.service';
@@ -45,6 +46,7 @@ export class TryonController {
   constructor(private readonly tryonService: TryonService) {}
 
   @Post()
+  @Throttle({ ai: { limit: 5, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('photo'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Virtual try-on with IDM-VTON (Pro/Pro Unlimited only)' })
@@ -57,6 +59,7 @@ export class TryonController {
   }
 
   @Post('outfit')
+  @Throttle({ ai: { limit: 5, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('basePhotoFile'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: TryonOutfitFormDto })
@@ -95,6 +98,7 @@ export class TryonController {
   }
 
   @Post('base-photos')
+  @Throttle({ upload: { limit: 15, ttl: 60000 } })
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')

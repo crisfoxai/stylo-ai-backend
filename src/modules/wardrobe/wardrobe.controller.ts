@@ -17,6 +17,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 
@@ -34,6 +35,7 @@ export class WardrobeController {
   constructor(private readonly wardrobeService: WardrobeService) {}
 
   @Post()
+  @Throttle({ upload: { limit: 15, ttl: 60000 } })
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(FileInterceptor('image'))
   @ApiConsumes('multipart/form-data')

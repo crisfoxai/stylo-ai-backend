@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/chat.dto';
@@ -14,6 +15,7 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('message')
+  @Throttle({ ai: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: 'Send message to AI stylist (Stylist/Pro/Pro Unlimited)' })
   async sendMessage(@CurrentUser() user: UserDocument, @Body() dto: SendMessageDto) {
     return this.chatService.sendMessage(String(user._id), dto);

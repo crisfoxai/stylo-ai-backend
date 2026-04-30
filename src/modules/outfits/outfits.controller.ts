@@ -15,6 +15,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { OutfitsService } from './outfits.service';
 import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
@@ -63,6 +64,7 @@ export class OutfitsController {
   }
 
   @Post('generate')
+  @Throttle({ ai: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Generate outfit preview (stored in Redis, not persisted)' })
   async generate(@CurrentUser() user: UserDocument, @Body() dto: GenerateOutfitDto) {
     return this.outfitsService.generate(String(user._id), dto);
@@ -115,6 +117,7 @@ export class OutfitsController {
   }
 
   @Post(':id/swap-garment')
+  @Throttle({ ai: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Suggest alternative garment for a slot (no persistence)' })
   async swapGarment(
     @CurrentUser() user: UserDocument,
