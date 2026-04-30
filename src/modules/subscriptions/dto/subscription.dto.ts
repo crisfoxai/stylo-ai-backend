@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsIn, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyReceiptDto {
@@ -10,6 +10,7 @@ export class VerifyReceiptDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(10000)
   receipt!: string;
 }
 

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsNumber, Min, Max, IsIn, ValidateNested, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, Min, Max, IsIn, ValidateNested, IsDateString, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -6,21 +6,25 @@ export class ListWardrobeDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   category?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   type?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   color?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   q?: string;
 
   @ApiPropertyOptional({ default: 1 })
@@ -40,41 +44,41 @@ export class ListWardrobeDto {
 }
 
 export class UpdateWardrobeItemDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() type?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() color?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() colorSecondary?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() brand?: string;
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) materials?: string[];
-  @ApiPropertyOptional() @IsOptional() @IsString() fit?: string;
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) seasons?: string[];
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) occasions?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) type?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) color?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) colorSecondary?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) brand?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(50, { each: true }) tags?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(100, { each: true }) materials?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) fit?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(20, { each: true }) seasons?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(50, { each: true }) occasions?: string[];
   @ApiPropertyOptional({ enum: ['top', 'bottom', 'shoes', 'accessory', 'outerwear', 'dress', 'other'] })
   @IsOptional() @IsString() @IsIn(['top', 'bottom', 'shoes', 'accessory', 'outerwear', 'dress', 'other'])
   category?: string;
   @ApiPropertyOptional({ enum: ['new', 'good', 'used', 'donate'] })
-  @IsOptional() @IsString() condition?: string;
+  @IsOptional() @IsString() @IsIn(['new', 'good', 'used', 'donate']) condition?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() purchasePrice?: number;
   @ApiPropertyOptional() @IsOptional() @IsDateString() purchaseDate?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) notes?: string;
 }
 
 export class ConfirmedGarmentDto {
-  @ApiProperty() @IsString() tipo!: string;
-  @ApiProperty() @IsString() color!: string;
-  @ApiProperty() @IsString() descripcion!: string;
-  @ApiProperty() @IsString() categoria!: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() material?: string;
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) materials?: string[];
-  @ApiPropertyOptional() @IsOptional() @IsString() style?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() fit?: string;
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) seasons?: string[];
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) occasions?: string[];
+  @ApiProperty() @IsString() @MaxLength(50) tipo!: string;
+  @ApiProperty() @IsString() @MaxLength(50) color!: string;
+  @ApiProperty() @IsString() @MaxLength(500) descripcion!: string;
+  @ApiProperty() @IsString() @MaxLength(50) categoria!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) material?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(100, { each: true }) materials?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) style?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) fit?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(20, { each: true }) seasons?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(50, { each: true }) occasions?: string[];
 }
 
 export class ConfirmDetectionDto {
-  @ApiProperty() @IsString() photoKey!: string;
+  @ApiProperty() @IsString() @MaxLength(500) photoKey!: string;
   @ApiProperty({ type: [ConfirmedGarmentDto] })
   @IsArray()
   @ValidateNested({ each: true })

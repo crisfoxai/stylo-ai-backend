@@ -11,5 +11,6 @@ export class SendMessageDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   sessionId?: string;
 }

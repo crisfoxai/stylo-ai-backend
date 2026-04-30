@@ -1,10 +1,11 @@
-import { IsString, IsNotEmpty, IsIn, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsIn, IsOptional, IsBoolean, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterTokenDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(512)
   token!: string;
 
   @ApiProperty({ enum: ['ios', 'android'] })

@@ -1,9 +1,9 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ApplyReferralCodeDto {
-  @ApiProperty() @IsString() @IsNotEmpty() code!: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() deviceFingerprint?: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(20) code!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) deviceFingerprint?: string;
 }
 
 export class ReferralStatsResponseDto {

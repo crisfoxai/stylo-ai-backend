@@ -8,6 +8,7 @@ import {
   IsBoolean,
   Min,
   Max,
+  MaxLength,
 } from 'class-validator';
 import { StyleTag, Occasion } from '../schemas/style-profile.schema';
 
@@ -22,6 +23,7 @@ export class UpdateStyleProfileDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(50, { each: true })
   colors?: string[];
 
   @ApiPropertyOptional({ enum: Occasion, isArray: true })
@@ -41,6 +43,7 @@ export class UpdateStyleProfileDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(100, { each: true })
   priorities?: string[];
 
   @ApiPropertyOptional()

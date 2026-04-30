@@ -1,15 +1,17 @@
-import { IsOptional, IsString, IsNotEmpty, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsNotEmpty, IsIn, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TryonDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
   garmentId!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   outfitId?: string;
 }
 
@@ -17,6 +19,7 @@ export class TryonOutfitGarmentDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
   garmentId!: string;
 
   @ApiProperty({ description: 'Garment category (top, bottom, outerwear, dress, or common aliases like pants, shirt, etc.)' })
