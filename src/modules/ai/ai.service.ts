@@ -433,4 +433,18 @@ Valores válidos:
       return [];
     }
   }
+
+  async ping(): Promise<void> {
+    if (this.geminiClient) {
+      const model = this.geminiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      await model.generateContent({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }], generationConfig: { maxOutputTokens: 1 } });
+      return;
+    }
+    if (this.provider === 'custom' && this.baseUrl) {
+      const res = await this.httpService.axiosRef.get(`${this.baseUrl}/health`, { timeout: 3000 });
+      if (res.status !== 200) throw new Error(`AI service returned ${res.status}`);
+      return;
+    }
+    throw new Error('No AI provider configured');
+  }
 }

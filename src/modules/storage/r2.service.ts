@@ -117,6 +117,12 @@ export class R2Service {
     } while (continuationToken);
   }
 
+  async ping(): Promise<void> {
+    if (this.mockMode) return;
+    const bucket = this.configService.getOrThrow<string>('R2_BUCKET_WARDROBE');
+    await this.client.send(new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 1 }));
+  }
+
   bucketWardrobe(): string {
     return this.configService.getOrThrow<string>('R2_BUCKET_WARDROBE');
   }
