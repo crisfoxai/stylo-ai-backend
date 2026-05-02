@@ -25,6 +25,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { ShareModule } from './modules/share/share.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { AiUsageModule } from './modules/ai-usage/ai-usage.module';
+import { BackupModule } from './modules/backup/backup.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import { AiUsageModule } from './modules/ai-usage/ai-usage.module';
     ShareModule,
     ReferralsModule,
     AiUsageModule,
+    BackupModule,
   ],
   providers: [
     {

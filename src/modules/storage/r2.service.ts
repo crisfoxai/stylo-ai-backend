@@ -117,6 +117,33 @@ export class R2Service {
     } while (continuationToken);
   }
 
+  async listObjectMetas(
+    bucket: string,
+    prefix: string,
+  ): Promise<{ key: string; lastModified: Date; size: number }[]> {
+    if (this.mockMode) return [];
+    const results: { key: string; lastModified: Date; size: number }[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const res = await this.client.send(
+        new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: continuationToken }),
+      );
+      for (const obj of res.Contents ?? []) {
+        if (obj.Key) {
+          results.push({
+            key: obj.Key,
+            lastModified: obj.LastModified ?? new Date(0),
+            size: obj.Size ?? 0,
+          });
+        }
+      }
+      continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return results;
+  }
+
   async ping(): Promise<void> {
     if (this.mockMode) return;
     const bucket = this.configService.getOrThrow<string>('R2_BUCKET_WARDROBE');
